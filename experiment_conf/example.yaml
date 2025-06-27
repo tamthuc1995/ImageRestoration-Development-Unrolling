@@ -1,0 +1,6 @@
+# general settings
+name: example_experiments
+task: None
+manual_seed: 2204
+path: 
+  root_dir: /home/dotamthuc/Works/Projects/ImageRestoration-Development-Template/
