@@ -3,4 +3,21 @@ name: example_experiments
 task: None
 manual_seed: 2204
 path: 
-  root_dir: /home/dotamthuc/Works/Projects/ImageRestoration-Development-Template/
+  root_dir: /home/dotamthuc/Works/Projects/ImageRestoration-Development-Unrolling/
+
+datasets:
+  train:
+    name: Training-data
+    type: AddictiveGaussianNoiseImagePair
+    dataset_args:
+      csv_path: /home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR_info.csv
+      dist_mode: addictive_noise_scale
+      lambda_noise: 15.0
+      patch_size: 64
+      patch_overlap_size: 32
+      max_num_patchs: 1000000
+      root_folder: /home/dotamthuc/Works/Projects/unrollGTV/data
+      logger_name: example_experiments
+      device_str: cpu
+    dataloader_args:
+      batch_size: 4

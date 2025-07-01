@@ -1,0 +1,56 @@
+2025-07-01 13:50:10,822 INFO: environ_conf=
+name: example_experiments
+task: None
+manual_seed: 2204
+path:{
+..root_dir: /home/dotamthuc/Works/Projects/ImageRestoration-Development-Unrolling/
+..checkpoints_folder: /home/dotamthuc/Works/Projects/ImageRestoration-Development-Unrolling/experiments/example_experiments/learning_checkpoints/
+..log_files_folder: /home/dotamthuc/Works/Projects/ImageRestoration-Development-Unrolling/experiments/example_experiments/log_files/
+}
+datasets:{
+..train:{
+....name: Training-data
+....type: AddictiveGaussianNoiseImagePair
+....dataset_args:{
+......csv_path: /home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR_info.csv
+......dist_mode: addictive_noise_scale
+......lambda_noise: 15.0
+......patch_size: 64
+......patch_overlap_size: 32
+......max_num_patchs: 1000000
+......root_folder: /home/dotamthuc/Works/Projects/unrollGTV/data
+......logger_name: example_experiments
+......device_str: cpu
+....}
+....dataloader_args:{
+......batch_size: 4
+....}
+..}
+}
+
+2025-07-01 13:50:11,165 INFO: Dataset - Create total 2044016 patchs
+2025-07-01 13:50:11,171 INFO: Dataset - Permute and select 1000000/2044016 patchs
+2025-07-01 13:50:11,238 INFO: Dataset AddictiveGaussianNoiseImagePair - Training-data is created.
+2025-07-01 13:50:11,238 INFO: Dataloader from AddictiveGaussianNoiseImagePair - Training-data is created.
+2025-07-01 13:50:11,239 INFO: Loadding patch: row=224, col=800, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0093.png
+2025-07-01 13:50:11,315 INFO: Loadding patch: row=640, col=1408, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0183.png
+2025-07-01 13:50:11,370 INFO: Loadding patch: row=864, col=1184, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0289.png
+2025-07-01 13:50:11,427 INFO: Loadding patch: row=960, col=1856, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0265.png
+2025-07-01 13:50:11,495 INFO: Dataset - Permute and select 1000000/2044016 patchs
+2025-07-01 13:50:11,559 INFO: Loadding patch: row=928, col=1408, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0050.png
+2025-07-01 13:50:11,630 INFO: Loadding patch: row=416, col=1536, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0305.png
+2025-07-01 13:50:11,673 INFO: Loadding patch: row=704, col=352, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0265.png
+2025-07-01 13:50:11,740 INFO: Loadding patch: row=832, col=1056, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0306.png
+2025-07-01 13:50:11,793 INFO: current_epoch = 10 current_sample=204
+2025-07-01 13:50:11,794 INFO: Dataset - Permute and select 1000000/2044016 patchs
+2025-07-01 13:50:11,855 INFO: Loadding patch: row=704, col=1888, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0090.png
+2025-07-01 13:50:11,920 INFO: Loadding patch: row=288, col=1120, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0221.png
+2025-07-01 13:50:11,972 INFO: Loadding patch: row=928, col=320, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0063.png
+2025-07-01 13:50:12,039 INFO: Loadding patch: row=928, col=768, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0129.png
+2025-07-01 13:50:12,092 INFO: current_epoch = 20 current_sample=504
+2025-07-01 13:50:12,092 INFO: Dataset - Permute and select 1000000/2044016 patchs
+2025-07-01 13:50:12,158 INFO: Loadding patch: row=704, col=1888, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0090.png
+2025-07-01 13:50:12,223 INFO: Loadding patch: row=288, col=1120, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0221.png
+2025-07-01 13:50:12,275 INFO: Loadding patch: row=928, col=320, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0063.png
+2025-07-01 13:50:12,341 INFO: Loadding patch: row=928, col=768, path=/home/dotamthuc/Works/Projects/unrollGTV/data/datasets/DIV2K/DIV2K_train_HR/0129.png
+2025-07-01 13:50:12,394 INFO: current_epoch = 20 current_sample=504

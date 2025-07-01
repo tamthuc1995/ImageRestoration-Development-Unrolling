@@ -9,10 +9,12 @@ import os
 import numpy as np
 
 
-from utils.small_utils import set_random_seed, get_time_str, pretty_strdict
-from utils.custome_parser import parse
-from utils.custom_logger import get_root_logger
+from environ.utils.small_utils import set_random_seed, get_time_str, pretty_strdict
+from environ.utils.custom_parser import parse
+from environ.utils.custom_logger import get_root_logger
 
+from environ.data import create_dataset, create_dataloader
+from environ.data.data_sampler import ResumeableSampler
 
 
 def parse_options(is_train=True):
@@ -74,11 +76,25 @@ def main():
     # initialize loggers
     log_file = os.path.join(
         environ_conf['path']['log_files_folder'], 
-        f"run_train_{environ_conf['name']}_{get_time_str()}.log"
+        f"run_train_{environ_conf['name']}.log"
     )
     logger = get_root_logger(
-        logger_name='example_experiments', log_level=logging.INFO, log_file=log_file)
+        logger_name=environ_conf["name"],
+        log_level=logging.INFO,
+        log_file=log_file
+    )
     logger.info(f"environ_conf={pretty_strdict(environ_conf)}")
+
+    # Create dataloader for training and validation
+    train_dataset_conf = environ_conf['datasets']['train']
+    train_dataset = create_dataset(train_dataset_conf, environ_conf)
+    train_sampler = ResumeableSampler(train_dataset)
+    train_dataloader = create_dataloader(train_dataset, train_sampler, train_dataset_conf, environ_conf)
+
+    # train_sampler.set_epoch_and_current_sample(
+    #     current_epoch=10,
+    #     current_sample=200
+    # )
 
     return None
 
