@@ -471,31 +471,17 @@ class MultiScaleMixtureGLR(nn.Module):
         )
 
         self.images_domain_to_abtract_domain = nn.Sequential(
-            nn.Conv2d(
-                in_channels=self.nchannels_images, 
-                out_channels=self.nchannels_abtract, 
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                dilation=1,
-                padding_mode="reflect",
-                bias=False
-            ),
+            nn.Conv2d(self.nchannels_images, self.nchannels_abtract, kernel_size=1, bias=False),
+            nn.ReLU(),
+            nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
             nn.ReLU(),
         ).to(self.device)
 
         self.abtract_domain_to_images_domain = nn.Sequential(
-            nn.ConvTranspose2d(
-                in_channels=self.nchannels_abtract,  
-                out_channels=self.nchannels_images,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                dilation=1,
-                padding_mode="zeros",
-                bias=False
-            ),
+            nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
             nn.ReLU(),
+            nn.Conv2d(self.nchannels_abtract, self.nchannels_images, kernel_size=1, bias=False),
+            nn.ReLU()
         ).to(self.device)
 
         self.patchs_embeding = nn.Conv2d(
