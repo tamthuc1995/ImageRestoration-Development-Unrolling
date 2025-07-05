@@ -96,20 +96,6 @@ data_test_batched = torch.utils.data.DataLoader(
 )
 
 NUM_EPOCHS = 45
-# CONNECTION_FLAGS = np.array([
-#     1,1,1,1,1,
-#     1,1,1,1,1,
-#     1,1,0,1,1,
-#     1,1,1,1,1,
-#     1,1,1,1,1,
-# ]).reshape((5,5))
-# CONNECTION_FLAGS = np.array([
-#     1,0,1,0,1,
-#     0,1,1,1,0,
-#     1,1,0,1,1,
-#     0,1,1,1,0,
-#     1,0,1,0,1,
-# ]).reshape((5,5))
 
 CONNECTION_FLAGS = np.array([
     1,1,1,
@@ -120,7 +106,7 @@ CONNECTION_FLAGS = np.array([
 modelConf = {"ModelLightWeightTransformerGLR": {
     "img_height":H_train,
     "img_width":W_train,
-    "n_blocks":3,
+    "n_blocks":4,
     "n_graphs":4,
     "n_levels":4,
     "device": DEVICE,
@@ -253,7 +239,6 @@ for epoch in range(NUM_EPOCHS):
         LOGGER.info(f"iter={i} time={time.time()-s} psnr={train_psnr} mse={train_mse_value}")
 
         if (i%VERBOSE_RATE == 0):
-            # torch.save(model.state_dict(), os.path.join(CHECKPOINT_DIR, f'test_{str(i).zfill(4)}.pt'))
             checkpoint = { 
                 'i': i,
                 'model': model.state_dict(),
