@@ -650,9 +650,11 @@ class MultiScaleMixtureGLR(nn.Module):
 
 
 class ModelLightWeightTransformerGLR(nn.Module):
-    def __init__(self, img_height, img_width, n_blocks, n_graphs, n_levels, device, global_mmglr_confs={}):
+    def __init__(self, nchannels_images, nchannels_abtract, img_height, img_width, n_blocks, n_graphs, n_levels, device, global_mmglr_confs={}):
         super(ModelLightWeightTransformerGLR, self).__init__()
 
+        self.nchannels_images = nchannels_images 
+        self.nchannels_abtract = nchannels_abtract 
         self.n_blocks = n_blocks
         self.n_graphs = n_graphs
         self.n_levels = n_levels
@@ -689,7 +691,9 @@ class ModelLightWeightTransformerGLR(nn.Module):
 
 
     def forward(self, input_patchs):
-        output = self.images_domain_to_abtract_domain(input_patchs)
+        output = self.images_domain_to_abtract_domain(input_patchs.permute((0, 3, 1, 2)))
+        output = output.permute((0, 2, 3, 1))
+
         for block_i in range(0, self.n_blocks):
             block = self.light_weight_transformer_blocks[block_i]
             output_temp = block(output)
@@ -697,6 +701,7 @@ class ModelLightWeightTransformerGLR(nn.Module):
             p = self.cumulative_result_weight[block_i]
             output = p * output_temp + (1-p) * output
 
-
-        output = self.abtract_domain_to_images_domain(output)
+        output = self.abtract_domain_to_images_domain(output.permute((0, 3, 1, 2)))
+        output = output.permute((0, 2, 3, 1))
+        
         return output

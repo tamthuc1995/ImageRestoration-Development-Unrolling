@@ -106,6 +106,8 @@ CONNECTION_FLAGS = np.array([
 modelConf = {"ModelLightWeightTransformerGLR": {
     "img_height":H_train,
     "img_width":W_train,
+    "nchannels_images": 3,
+    "nchannels_abtract": 9,
     "n_blocks":5,
     "n_graphs":5,
     "n_levels":4,
