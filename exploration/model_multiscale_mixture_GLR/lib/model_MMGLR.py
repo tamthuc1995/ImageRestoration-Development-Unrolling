@@ -470,20 +470,6 @@ class MultiScaleMixtureGLR(nn.Module):
             requires_grad=True,
         )
 
-        self.images_domain_to_abtract_domain = nn.Sequential(
-            nn.Conv2d(self.nchannels_images, self.nchannels_abtract, kernel_size=1, bias=False),
-            nn.ReLU(),
-            nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
-            nn.ReLU(),
-        ).to(self.device)
-
-        self.abtract_domain_to_images_domain = nn.Sequential(
-            nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
-            nn.ReLU(),
-            nn.Conv2d(self.nchannels_abtract, self.nchannels_images, kernel_size=1, bias=False),
-            nn.ReLU()
-        ).to(self.device)
-
         self.patchs_embeding = nn.Conv2d(
             Extractor_modules_conf[0]["ExtractorConf"]["n_channels_in"],
             Extractor_modules_conf[0]["ExtractorConf"]["n_features_in"], 
@@ -601,7 +587,7 @@ class MultiScaleMixtureGLR(nn.Module):
         # with record_function("MultiScaleMixtureGLR:forward"): 
         # print("#"*80)
         patchs = patchs.permute(dims=(0, 3, 1, 2))
-        patchs = self.images_domain_to_abtract_domain(patchs)
+        # patchs = self.images_domain_to_abtract_domain(patchs)
         # print(f"patchs.shape={patchs.shape}")
         batch_size, c_size, h_size, w_size = patchs.shape
 
@@ -655,9 +641,8 @@ class MultiScaleMixtureGLR(nn.Module):
         )
 
         # output = torch.clip(output, min=0.0, max=1.0).permute(dims=(0, 2, 3, 1))
-
         # print(f"output.shape={output.shape}")
-        output = self.abtract_domain_to_images_domain(output)
+        # output = self.abtract_domain_to_images_domain(output)
         # print(f"output_patch.shape={output.shape}")
         output = output.permute(dims=(0, 2, 3, 1))
         return output
@@ -683,6 +668,15 @@ class ModelLightWeightTransformerGLR(nn.Module):
             requires_grad=True
         )
 
+        self.images_domain_to_abtract_domain = nn.Sequential(
+            nn.Conv2d(self.nchannels_images, self.nchannels_abtract, kernel_size=1, bias=False),
+            nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
+        ).to(self.device)
+
+        self.abtract_domain_to_images_domain = nn.Sequential(
+            nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
+            nn.Conv2d(self.nchannels_abtract, self.nchannels_images, kernel_size=1, bias=False),
+        ).to(self.device)
 
         self.graph_frame_recalibrate(img_height, img_width)
 
@@ -695,7 +689,7 @@ class ModelLightWeightTransformerGLR(nn.Module):
 
 
     def forward(self, input_patchs):
-        output = input_patchs
+        output = self.images_domain_to_abtract_domain(input_patchs)
         for block_i in range(0, self.n_blocks):
             block = self.light_weight_transformer_blocks[block_i]
             output_temp = block(output)
@@ -703,4 +697,6 @@ class ModelLightWeightTransformerGLR(nn.Module):
             p = self.cumulative_result_weight[block_i]
             output = p * output_temp + (1-p) * output
 
+
+        output = self.abtract_domain_to_images_domain(output)
         return output
