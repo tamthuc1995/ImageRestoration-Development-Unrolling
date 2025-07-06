@@ -30,7 +30,7 @@ from dataloader import ImageSuperResolution
 import model_MMGLR as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test09/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test10/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -39,7 +39,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test09/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test10/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train, W_train) = (128, 128)
