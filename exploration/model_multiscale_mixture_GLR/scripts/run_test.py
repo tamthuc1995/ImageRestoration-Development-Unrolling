@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
-from torch.optim import Adam, Adadelta, SGD
+from torch.optim import Adam, AdamW
 
 #########################################################################################################
 torch.set_float32_matmul_precision('high')
@@ -30,7 +30,7 @@ from dataloader import ImageSuperResolution
 import model_MMGLR as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test10/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test11/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -39,7 +39,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test10/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test11/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train, W_train) = (128, 128)
@@ -75,7 +75,7 @@ test_dataset = ImageSuperResolution(
     dist_mode="addictive_noise_scale",
     lambda_noise=25.0,
     patch_size=H_test,
-    patch_overlap_size=H_train//2,
+    patch_overlap_size=0,
     max_num_patchs=1000000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
@@ -107,15 +107,15 @@ modelConf = {"ModelLightWeightTransformerGLR": {
     "img_height":H_train,
     "img_width":W_train,
     "nchannels_images": 3,
-    "nchannels_abtract": 9,
-    "n_blocks":5,
+    "nchannels_abtract": 12,
+    "n_blocks":3,
     "n_graphs":5,
     "n_levels":4,
     "device": DEVICE,
     "global_mmglr_confs" : {
         "n_graphs":5,
         "n_levels":4,
-        "n_cgd_iters":10,
+        "n_cgd_iters":5,
         "alpha_init":0.5,
         "muy_init": torch.tensor([[0.3], [0.15], [0.075], [0.0375]]).to(DEVICE),
         "beta_init":0.1,
@@ -124,8 +124,8 @@ modelConf = {"ModelLightWeightTransformerGLR": {
             {"GLRConf":{
                 "input_width": H_train,
                 "input_height": W_train,
-                "n_channels": 9,
-                "n_node_fts": 8,
+                "n_channels": 12,
+                "n_node_fts": 12,
                 "n_graphs": 5,
                 "connection_window": CONNECTION_FLAGS,
                 "device": DEVICE,
@@ -135,8 +135,8 @@ modelConf = {"ModelLightWeightTransformerGLR": {
             {"GLRConf":{
                 "input_width": H_train//2,
                 "input_height": W_train//2,
-                "n_channels": 9,
-                "n_node_fts": 8,
+                "n_channels": 12,
+                "n_node_fts": 12,
                 "n_graphs": 5,
                 "connection_window": CONNECTION_FLAGS,
                 "device": DEVICE,
@@ -146,8 +146,8 @@ modelConf = {"ModelLightWeightTransformerGLR": {
             {"GLRConf":{
                 "input_width": H_train//4,
                 "input_height": W_train//4,
-                "n_channels": 9,
-                "n_node_fts": 16,
+                "n_channels": 12,
+                "n_node_fts": 24,
                 "n_graphs": 5,
                 "connection_window": CONNECTION_FLAGS,
                 "device": DEVICE,
@@ -157,8 +157,8 @@ modelConf = {"ModelLightWeightTransformerGLR": {
             {"GLRConf":{
                 "input_width": H_train//8,
                 "input_height": W_train//8,
-                "n_channels": 9,
-                "n_node_fts": 32,
+                "n_channels": 12,
+                "n_node_fts": 48,
                 "n_graphs": 5,
                 "connection_window": CONNECTION_FLAGS,
                 "device": DEVICE,
@@ -168,24 +168,24 @@ modelConf = {"ModelLightWeightTransformerGLR": {
         ],
         "Extractor_modules_conf":[
             {"ExtractorConf":{
-                "n_features_in": 40,
-                "n_features_out": 40,
-                "n_channels_in": 9,
-                "n_channels_out": 9,
+                "n_features_in": 60,
+                "n_features_out": 60,
+                "n_channels_in": 12,
+                "n_channels_out": 12,
                 "device": DEVICE
             }},
             {"ExtractorConf":{
-                "n_features_in": 40,
-                "n_features_out": 80,
-                "n_channels_in": 9,
-                "n_channels_out": 9,
+                "n_features_in": 60,
+                "n_features_out": 120,
+                "n_channels_in": 12,
+                "n_channels_out": 12,
                 "device": DEVICE
             }},
             {"ExtractorConf":{
-                "n_features_in": 80,
-                "n_features_out": 160,
-                "n_channels_in": 9,
-                "n_channels_out": 9,
+                "n_features_in": 120,
+                "n_features_out": 240,
+                "n_channels_in": 12,
+                "n_channels_out": 12,
                 "device": DEVICE
             }},
         ]}
@@ -201,10 +201,10 @@ for p in model.parameters():
 
 LOGGER.info(f"Init model with total parameters: {s}")
 
-criterian = nn.MSELoss()
-optimizer = Adam(
+criterian = nn.L1Loss()
+optimizer = AdamW(
     model.parameters(),
-    lr=0.001,
+    lr=0.0003,
     eps=1e-08
 )
 
@@ -230,8 +230,8 @@ for epoch in range(NUM_EPOCHS):
         patchs_noisy = patchs_noisy.to(DEVICE)
         patchs_true = patchs_true.to(DEVICE) 
         reconstruct_patchs = model(patchs_noisy)
-        loss_mse = criterian(reconstruct_patchs, patchs_true)
-        loss_mse.backward()
+        loss_value = criterian(reconstruct_patchs, patchs_true)
+        loss_value.backward()
         optimizer.step()
 
         img_true = np.clip(patchs_true.detach().cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)

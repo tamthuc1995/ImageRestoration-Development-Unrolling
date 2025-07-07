@@ -386,19 +386,19 @@ class Extractor(nn.Module):
     
         # Features extractor
         self.cnn_layer = nn.Sequential(
+            # nn.Conv2d(
+            #     in_channels=n_features_in, 
+            #     out_channels=n_features_out//4, 
+            #     kernel_size=3,
+            #     stride=1,
+            #     padding=1,
+            #     dilation=1,
+            #     padding_mode="zeros",
+            #     bias=True
+            # ),
+            # nn.ReLU(),
             nn.Conv2d(
                 in_channels=n_features_in, 
-                out_channels=n_features_out//4, 
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                dilation=1,
-                padding_mode="zeros",
-                bias=True
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                in_channels=n_features_out//4, 
                 out_channels=n_features_out//4, 
                 kernel_size=3,
                 stride=1,
