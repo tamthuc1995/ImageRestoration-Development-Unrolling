@@ -27,10 +27,10 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
 from dataloader import ImageSuperResolution
-import model_MMGLR_fast as model_structure
+import model_lightformer as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test12/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test13/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -39,7 +39,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test12/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test13/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train, W_train) = (128, 128)
@@ -103,75 +103,18 @@ CONNECTION_FLAGS = np.array([
     1,1,1,
 ]).reshape((3,3))
 
-# CONNECTION_FLAGS = np.array([
-#     1,0,1,0,1,
-#     0,0,0,0,0,
-#     1,0,0,0,1,
-#     0,0,0,0,0,
-#     1,0,1,0,1,
-# ]).reshape((5,5))
-
-modelConf = {"ModelLightWeightTransformerGLR": {
-    "img_height":H_train,
-    "img_width":W_train,
-    "n_blocks":4,
-    "n_graphs":5,
-    "n_levels":3,
-    "device": DEVICE,
-    "global_mmglr_confs" : {
-        "n_graphs":16,
-        "n_levels":3,
-        "n_cgd_iters":5,
-        "alpha_init":0.5,
-        "muy_init": torch.tensor([[0.3], [0.1], [0.01]]).to(DEVICE),
-        "beta_init":0.1,
-        "device":DEVICE,
-        "GLR_modules_conf": [
-            {"GLRConf":{
-                "n_channels": 3,
-                "n_node_fts": 4,
-                "n_graphs": 16,
-                "connection_window": CONNECTION_FLAGS,
-                "device": DEVICE,
-                "M_diag_init": 1.0,
-            }},
-            {"GLRConf":{
-                "n_channels": 3,
-                "n_node_fts": 4,
-                "n_graphs": 16,
-                "connection_window": CONNECTION_FLAGS,
-                "device": DEVICE,
-                "M_diag_init": 1.0,
-            }},
-            {"GLRConf":{
-                "n_channels": 3,
-                "n_node_fts": 4,
-                "n_graphs": 16,
-                "connection_window": CONNECTION_FLAGS,
-                "device": DEVICE,
-                "M_diag_init": 1.0,
-            }},
-        ],
-        "Extractor_modules_conf":[
-            {"ExtractorConf":{
-                "n_features_in": 64,
-                "n_features_out": 64,
-                "n_channels_in": 3,
-                "n_channels_out": 3,
-                "device": DEVICE
-            }},
-            {"ExtractorConf":{
-                "n_features_in": 64,
-                "n_features_out": 64,
-                "n_channels_in": 3,
-                "n_channels_out": 3,
-                "device": DEVICE
-            }},
-        ]}
-    }
+modelConf = {
+    "inp_channels": 3, 
+    "out_channels": 3, 
+    "n_abtract_channels": 48,
+    "num_blocks_per_level": [2, 3, 3, 4], 
+    "n_graphs_per_level": [2, 4, 4, 8],
+    "n_cgd_per_level": [2, 2, 2, 2],
+    "num_blocks_output": 4,
+    "device": DEVICE
 }
 
-model = model_structure.ModelLightWeightTransformerGLR(**modelConf["ModelLightWeightTransformerGLR"])
+model = model_structure.MultiscaleLightWeightTransformer(**modelConf)
 
 s = 0
 for p in model.parameters():
@@ -181,9 +124,10 @@ for p in model.parameters():
 LOGGER.info(f"Init model with total parameters: {s}")
 
 criterian = nn.L1Loss()
-optimizer = AdamW(
+optimizer = Adam(
     model.parameters(),
     lr=0.0003,
+    # weight_decay=0.0001,
     eps=1e-08
 )
 
@@ -208,7 +152,7 @@ for epoch in range(NUM_EPOCHS):
         optimizer.zero_grad()
         patchs_noisy = patchs_noisy.to(DEVICE)
         patchs_true = patchs_true.to(DEVICE) 
-        reconstruct_patchs = model(patchs_noisy)
+        reconstruct_patchs = model(patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
         loss_value = criterian(reconstruct_patchs, patchs_true)
         loss_value.backward()
         optimizer.step()
@@ -228,7 +172,7 @@ for epoch in range(NUM_EPOCHS):
             torch.save(checkpoint, os.path.join(CHECKPOINT_DIR, f'checkpoints_epoch{str(epoch).zfill(2)}_iter{str(i//VERBOSE_RATE).zfill(4)}k.pt'))
 
 
-        if (i%(VERBOSE_RATE/5) == 0):
+        if (i%(VERBOSE_RATE//2) == 0):
             # LOGGER.info(f"Start VALIDATION EPOCH {epoch} - iter={i}")
 
             # ### VALIDAING
@@ -241,12 +185,12 @@ for epoch in range(NUM_EPOCHS):
                     val_patchs_noisy = val_patchs_noisy.to(DEVICE)
                     val_patchs_true = val_patchs_true.to(DEVICE) 
 
-                    reconstruct_patchs = model(val_patchs_noisy)
+                    reconstruct_patchs = model(val_patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
                     img_true = np.clip(val_patchs_true.cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
                     img_recon = np.clip(reconstruct_patchs.cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
                     val_mse_value = np.square(img_true- img_recon).mean()
                     list_val_mse.append(val_mse_value)
-                    # LOGGER.info(f"test_i={test_i} time={time.time()-s} test_i_psnr_value={10 * np.log10(1/test_mse_value)}")
+                    # print(f"val_i={val_i} time={time.time()-s} val_i_psnr_value={10 * np.log10(1/val_mse_value)}")
                 val_i+=1
 
             psnr_validation = 10 * np.log10(1/np.array(list_val_mse))
@@ -266,7 +210,7 @@ for epoch in range(NUM_EPOCHS):
                 with torch.no_grad():
                     test_patchs_noisy = test_patchs_noisy.to(DEVICE)
                     test_patchs_true = test_patchs_true.to(DEVICE) 
-                    reconstruct_patchs = model(test_patchs_noisy)
+                    reconstruct_patchs = model(test_patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
                     img_true = np.clip(test_patchs_true[0].cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
                     img_recon = np.clip(reconstruct_patchs[0].cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
                     test_mse_value = np.square(img_true- img_recon).mean()

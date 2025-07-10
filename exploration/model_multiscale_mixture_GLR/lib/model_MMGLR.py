@@ -7,6 +7,7 @@ from torch.nn.parameter import Parameter
 from torch.profiler import profile, record_function, ProfilerActivity
 # torch.set_default_dtype(torch.float64)
 
+from einops import rearrange
 
 def MortonFromPosition(position):
     """Convert integer (x,y,z) positions to Morton codes
@@ -104,6 +105,62 @@ def create_sparse_structure_from_images(img_height, img_width, edge_delta):
     sparse_image_obj["edges_type"]     = edges_type
     return sparse_image_obj
 
+
+
+def to_3d(x):
+    return rearrange(x, 'b c h w -> b (h w) c')
+
+def to_4d(x,h,w):
+    return rearrange(x, 'b (h w) c -> b c h w',h=h,w=w)
+
+class BiasFree_LayerNorm(nn.Module):
+    def __init__(self, normalized_shape):
+        super(BiasFree_LayerNorm, self).__init__()
+        if isinstance(normalized_shape, int):
+            normalized_shape = (normalized_shape,)
+        normalized_shape = torch.Size(normalized_shape)
+
+        assert len(normalized_shape) == 1
+
+        self.weight = nn.Parameter(torch.ones(normalized_shape))
+        self.normalized_shape = normalized_shape
+
+    def forward(self, x):
+        sigma = x.var(-1, keepdim=True, unbiased=False)
+        return x / torch.sqrt(sigma+1e-5) * self.weight
+
+class WithBias_LayerNorm(nn.Module):
+    def __init__(self, normalized_shape):
+        super(WithBias_LayerNorm, self).__init__()
+        if isinstance(normalized_shape, int):
+            normalized_shape = (normalized_shape,)
+        normalized_shape = torch.Size(normalized_shape)
+
+        assert len(normalized_shape) == 1
+
+        self.weight = nn.Parameter(torch.ones(normalized_shape))
+        self.bias = nn.Parameter(torch.zeros(normalized_shape))
+        self.normalized_shape = normalized_shape
+
+    def forward(self, x):
+        mu = x.mean(-1, keepdim=True)
+        sigma = x.var(-1, keepdim=True, unbiased=False)
+        return (x - mu) / torch.sqrt(sigma+1e-5) * self.weight + self.bias
+
+
+class LayerNorm(nn.Module):
+    def __init__(self, dim, LayerNorm_type):
+        super(LayerNorm, self).__init__()
+        if LayerNorm_type =='BiasFree':
+            self.body = BiasFree_LayerNorm(dim)
+        else:
+            self.body = WithBias_LayerNorm(dim)
+
+    def forward(self, x):
+        h, w = x.shape[-2:]
+        return to_4d(self.body(to_3d(x)), h, w)
+
+    
 
 class GLR(nn.Module):
     def __init__(self, 
@@ -386,17 +443,6 @@ class Extractor(nn.Module):
     
         # Features extractor
         self.cnn_layer = nn.Sequential(
-            # nn.Conv2d(
-            #     in_channels=n_features_in, 
-            #     out_channels=n_features_out//4, 
-            #     kernel_size=3,
-            #     stride=1,
-            #     padding=1,
-            #     dilation=1,
-            #     padding_mode="zeros",
-            #     bias=True
-            # ),
-            # nn.ReLU(),
             nn.Conv2d(
                 in_channels=n_features_in, 
                 out_channels=n_features_out//4, 
@@ -407,7 +453,8 @@ class Extractor(nn.Module):
                 padding_mode="zeros",
                 bias=False
             ),
-            nn.PixelUnshuffle(2)
+            nn.PixelUnshuffle(2),
+            LayerNorm(n_features_out, 'BiasFree')
         ).to(self.device)
 
     def downsampling(self, input_patchs):
@@ -650,11 +697,11 @@ class MultiScaleMixtureGLR(nn.Module):
 
 
 class ModelLightWeightTransformerGLR(nn.Module):
-    def __init__(self, nchannels_images, nchannels_abtract, img_height, img_width, n_blocks, n_graphs, n_levels, device, global_mmglr_confs={}):
+    def __init__(self, img_height, img_width, n_blocks, n_graphs, n_levels, device, global_mmglr_confs={}):
         super(ModelLightWeightTransformerGLR, self).__init__()
 
-        self.nchannels_images = nchannels_images 
-        self.nchannels_abtract = nchannels_abtract 
+        # self.nchannels_images = nchannels_images 
+        # self.nchannels_abtract = nchannels_abtract 
         self.n_blocks = n_blocks
         self.n_graphs = n_graphs
         self.n_levels = n_levels
@@ -670,15 +717,15 @@ class ModelLightWeightTransformerGLR(nn.Module):
             requires_grad=True
         )
 
-        self.images_domain_to_abtract_domain = nn.Sequential(
-            nn.Conv2d(self.nchannels_images, self.nchannels_abtract, kernel_size=1, bias=False),
-            nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
-        ).to(self.device)
+        # self.images_domain_to_abtract_domain = nn.Sequential(
+        #     nn.Conv2d(self.nchannels_images, self.nchannels_abtract, kernel_size=1, bias=False),
+        #     nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
+        # ).to(self.device)
 
-        self.abtract_domain_to_images_domain = nn.Sequential(
-            nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
-            nn.Conv2d(self.nchannels_abtract, self.nchannels_images, kernel_size=1, bias=False),
-        ).to(self.device)
+        # self.abtract_domain_to_images_domain = nn.Sequential(
+        #     nn.Conv2d(self.nchannels_abtract, self.nchannels_abtract, kernel_size=3, stride=1, padding=1, groups=self.nchannels_abtract, bias=False),
+        #     nn.Conv2d(self.nchannels_abtract, self.nchannels_images, kernel_size=1, bias=False),
+        # ).to(self.device)
 
         self.graph_frame_recalibrate(img_height, img_width)
 
@@ -691,9 +738,8 @@ class ModelLightWeightTransformerGLR(nn.Module):
 
 
     def forward(self, input_patchs):
-        output = self.images_domain_to_abtract_domain(input_patchs.permute((0, 3, 1, 2)))
-        output = output.permute((0, 2, 3, 1))
-
+        # output = self.images_domain_to_abtract_domain(input_patchs.permute((0, 3, 1, 2)))
+        output = input_patchs
         for block_i in range(0, self.n_blocks):
             block = self.light_weight_transformer_blocks[block_i]
             output_temp = block(output)
@@ -701,7 +747,9 @@ class ModelLightWeightTransformerGLR(nn.Module):
             p = self.cumulative_result_weight[block_i]
             output = p * output_temp + (1-p) * output
 
-        output = self.abtract_domain_to_images_domain(output.permute((0, 3, 1, 2)))
-        output = output.permute((0, 2, 3, 1))
+        # output = self.abtract_domain_to_images_domain(output.permute((0, 3, 1, 2)))
+        # output = output.permute((0, 2, 3, 1))
         
         return output
+
+
