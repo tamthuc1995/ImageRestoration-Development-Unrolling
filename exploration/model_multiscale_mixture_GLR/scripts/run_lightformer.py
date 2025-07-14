@@ -16,6 +16,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
 from torch.optim import Adam, AdamW
+from torch.optim.lr_scheduler import MultiStepLR
 
 #########################################################################################################
 torch.set_float32_matmul_precision('high')
@@ -27,10 +28,10 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
 from dataloader import ImageSuperResolution
-import model_lightformer as model_structure
+import model_MMGLR_deep as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test13/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_MMGLR_deep/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -39,7 +40,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test13/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_MMGLR_deep/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train, W_train) = (128, 128)
@@ -52,7 +53,7 @@ train_dataset = ImageSuperResolution(
     lambda_noise=25.0,
     patch_size=H_train,
     patch_overlap_size=H_train//2,
-    max_num_patchs=1000000,
+    max_num_patchs=2000000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
@@ -97,24 +98,24 @@ data_test_batched = torch.utils.data.DataLoader(
 
 NUM_EPOCHS = 45
 
-CONNECTION_FLAGS = np.array([
-    1,1,1,
-    1,0,1,
-    1,1,1,
-]).reshape((3,3))
+# CONNECTION_FLAGS = np.array([
+#     1,1,1,
+#     1,0,1,
+#     1,1,1,
+# ]).reshape((3,3))
 
-modelConf = {
-    "inp_channels": 3, 
-    "out_channels": 3, 
-    "n_abtract_channels": 48,
-    "num_blocks_per_level": [2, 3, 3, 4], 
-    "n_graphs_per_level": [2, 4, 4, 8],
-    "n_cgd_per_level": [2, 2, 2, 2],
-    "num_blocks_output": 4,
-    "device": DEVICE
-}
+# CONNECTION_FLAGS = np.array([
+#     1,1,1,1,1,
+#     1,1,1,1,1,
+#     1,1,0,1,1,
+#     1,1,1,1,1,
+#     1,1,1,1,1,
+# ]).reshape((5,5))
 
-model = model_structure.MultiscaleLightWeightTransformer(**modelConf)
+model = model_structure.MultiScaleSequenceDenoiser(
+    device=DEVICE
+)
+
 
 s = 0
 for p in model.parameters():
@@ -126,9 +127,12 @@ LOGGER.info(f"Init model with total parameters: {s}")
 criterian = nn.L1Loss()
 optimizer = Adam(
     model.parameters(),
-    lr=0.0003,
-    # weight_decay=0.0001,
+    lr=0.001,
     eps=1e-08
+)
+lr_scheduler = MultiStepLR(
+    optimizer,
+    milestones=[100000, 200000, 300000, 400000, 500000], gamma=0.7
 )
 
 ### TRAINING
@@ -156,6 +160,7 @@ for epoch in range(NUM_EPOCHS):
         loss_value = criterian(reconstruct_patchs, patchs_true)
         loss_value.backward()
         optimizer.step()
+        lr_scheduler.step()
 
         img_true = np.clip(patchs_true.detach().cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
         img_recon = np.clip(reconstruct_patchs.detach().cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
@@ -168,6 +173,7 @@ for epoch in range(NUM_EPOCHS):
                 'i': i,
                 'model': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
+                'lr_scheduler': lr_scheduler.state_dict()
             }
             torch.save(checkpoint, os.path.join(CHECKPOINT_DIR, f'checkpoints_epoch{str(epoch).zfill(2)}_iter{str(i//VERBOSE_RATE).zfill(4)}k.pt'))
 
@@ -222,4 +228,4 @@ for epoch in range(NUM_EPOCHS):
             LOGGER.info(f"FINISH TESING EPOCH {epoch} - iter={i} -  psnr_testing={np.mean(psnr_testing)}")
             model.train()
 
-        i+=1     
+        i+=1

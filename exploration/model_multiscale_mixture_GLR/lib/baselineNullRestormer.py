@@ -48,6 +48,33 @@ class GLRFast(nn.Module):
             torch.ones((self.n_graphs, self.n_node_fts), device=self.device, dtype=torch.float32)*M_diag_init,
             requires_grad=True,
         )
+        #############
+        avg_kernel = 1.0 * torch.tensor([
+            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ])
+        # delta_x = 0.5 * torch.tensor([
+        #     [0.0, 0.0, 0.0],
+        #     [0.0,-1.0, 1.0],
+        #     [0.0, 0.0, 0.0],
+        # ])
+        # delta_y = 0.5 * torch.tensor([
+        #     [0.0, 0.0, 0.0],
+        #     [0.0,-1.0, 0.0],
+        #     [0.0, 1.0, 0.0],
+        # ])
+        kernel = []
+        for r in range(self.n_channels):
+            kernel.append(avg_kernel[np.newaxis, np.newaxis, :, :])
+            # kernel.append(delta_x[np.newaxis, np.newaxis, :, :])
+            # kernel.append(delta_y[np.newaxis, np.newaxis, :, :])
+
+        kernel = torch.concat(kernel, axis=0).to(self.device)
+        self.stats_kernel = Parameter(
+            torch.ones((self.n_channels, 1, 3, 3), device=self.device, dtype=torch.float32) * kernel,
+            requires_grad=True,
+        )
 
 
     def get_neighbors_pixels(self, img_features):
@@ -129,15 +156,47 @@ class GLRFast(nn.Module):
         return output
 
 
+    def stats_conv(self, patchs):
+        batch_size, n_graphs, c_size, h_size, w_size = patchs.shape
+        temp_patch = patchs.view(batch_size*n_graphs, c_size, h_size, w_size)
+        temp_patch = nn.functional.pad(temp_patch, (1,1,1,1), 'reflect')
+        temp_out_patch = nn.functional.conv2d(
+            temp_patch,
+            weight=self.stats_kernel,
+            stride=1,
+            padding=0,
+            dilation=1,
+            groups=self.n_channels,
+        )
+        out_patch = temp_out_patch.view(batch_size, n_graphs, c_size, h_size, w_size)
+        return out_patch
 
+    def stats_conv_transpose(self, patchs):
+        batch_size, n_graphs, c_size, h_size, w_size = patchs.shape
+        temp_patch = patchs.reshape(batch_size*n_graphs, c_size, h_size, w_size)
+        temp_out_patch = nn.functional.conv_transpose2d(
+            temp_patch,
+            weight=self.stats_kernel,
+            stride=1,
+            padding=1,
+            dilation=1,
+            groups=self.n_channels,
+        )
+        out_patch = temp_out_patch.view(batch_size, n_graphs, c_size, h_size, h_size)
+        return out_patch
 
     def forward(self, patchs, edge_weights, node_degree):
         # with record_function("GLR:forward"): 
         # F
         # batch_size, n_graphs, c_size, h_size, w_size = patchs.shape
+
+        patchs = self.stats_conv(patchs)
+        # batch_size, n_graphs, c_size, h_size, w_size = patchs.shape
         # L
         output_patchs = self.op_L_norm(patchs, edge_weights, node_degree)
 
+        # F^T
+        output_patchs = self.stats_conv_transpose(output_patchs)
         return output_patchs
     
 
@@ -199,7 +258,7 @@ class MixtureGGLR(nn.Module):
                 kernel_size=1,
                 stride=1,
                 padding=0,
-                padding_mode="replicate",
+                padding_mode="zeros",
                 bias=False
             ),
             nn.Softmax(dim=1)
@@ -259,8 +318,14 @@ class MixtureGGLR(nn.Module):
 
         # one step
         output = patchs[:, None, :, :, :]
-        system_residual = output -  self.apply_lightweight_transformer(output, gW, gD)
-        output = output + self.alphaCGD[0, None, :, None, None, None] * system_residual
+        system_residual = patchs[:, None, :, :, :] -  self.apply_lightweight_transformer(output, gW, gD)
+        update = system_residual
+        output = output + self.alphaCGD[0, None, :, None, None, None] * update
+
+        # two step
+        system_residual = patchs[:, None, :, :, :] -  self.apply_lightweight_transformer(output, gW, gD)
+        update = system_residual + self.betaCGD[1, None, :, None, None, None] * update
+        output = output + self.alphaCGD[1, None, :, None, None, None] * update
 
         score = self.combination_weight(features_patchs)
         output = torch.einsum(
@@ -334,6 +399,7 @@ class FeedForward(nn.Module):
         super(FeedForward, self).__init__()
 
         hidden_features = int(dim*ffn_expansion_factor)
+        # hidden_features = dim
 
         self.project_in = nn.Conv2d(dim, hidden_features*2, kernel_size=1, bias=bias)
 
@@ -350,42 +416,42 @@ class FeedForward(nn.Module):
 
 
 
-##########################################################################
-## Multi-DConv Head Transposed Self-Attention (MDTA)
-class Attention(nn.Module):
-    def __init__(self, dim, num_heads, bias):
-        super(Attention, self).__init__()
-        self.num_heads = num_heads
-        self.temperature = nn.Parameter(torch.ones(num_heads, 1, 1))
+# ##########################################################################
+# ## Multi-DConv Head Transposed Self-Attention (MDTA)
+# class Attention(nn.Module):
+#     def __init__(self, dim, num_heads, bias):
+#         super(Attention, self).__init__()
+#         self.num_heads = num_heads
+#         self.temperature = nn.Parameter(torch.ones(num_heads, 1, 1))
 
-        self.qkv = nn.Conv2d(dim, dim*3, kernel_size=1, bias=bias)
-        self.qkv_dwconv = nn.Conv2d(dim*3, dim*3, kernel_size=3, stride=1, padding=1, groups=dim*3, bias=bias)
-        self.project_out = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
+#         self.qkv = nn.Conv2d(dim, dim*3, kernel_size=1, bias=bias)
+#         self.qkv_dwconv = nn.Conv2d(dim*3, dim*3, kernel_size=3, stride=1, padding=1, groups=dim*3, bias=bias)
+#         self.project_out = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
         
 
 
-    def forward(self, x):
-        b,c,h,w = x.shape
+#     def forward(self, x):
+#         b,c,h,w = x.shape
 
-        qkv = self.qkv_dwconv(self.qkv(x))
-        q,k,v = qkv.chunk(3, dim=1)   
+#         qkv = self.qkv_dwconv(self.qkv(x))
+#         q,k,v = qkv.chunk(3, dim=1)   
         
-        q = rearrange(q, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
-        k = rearrange(k, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
-        v = rearrange(v, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
+#         q = rearrange(q, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
+#         k = rearrange(k, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
+#         v = rearrange(v, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
 
-        q = torch.nn.functional.normalize(q, dim=-1)
-        k = torch.nn.functional.normalize(k, dim=-1)
+#         q = torch.nn.functional.normalize(q, dim=-1)
+#         k = torch.nn.functional.normalize(k, dim=-1)
 
-        attn = (q @ k.transpose(-2, -1)) * self.temperature
-        attn = attn.softmax(dim=-1)
+#         attn = (q @ k.transpose(-2, -1)) * self.temperature
+#         attn = attn.softmax(dim=-1)
 
-        out = (attn @ v)
+#         out = (attn @ v)
         
-        out = rearrange(out, 'b head c (h w) -> b (head c) h w', head=self.num_heads, h=h, w=w)
+#         out = rearrange(out, 'b head c (h w) -> b (head c) h w', head=self.num_heads, h=h, w=w)
 
-        out = self.project_out(out)
-        return out
+#         out = self.project_out(out)
+#         return out
 
 
 
@@ -431,7 +497,7 @@ class FFBlock(nn.Module):
             "n_graphs": num_heads,
             "n_node_fts": dim // num_heads,
             "connection_window": CONNECTION_FLAGS,
-            "n_cgd_iters": 1,
+            "n_cgd_iters": 2,
             "alpha_init": 0.5,
             "beta_init": 0.1,
             "muy_init": 0.1,
