@@ -43,8 +43,8 @@ logging.basicConfig(
 CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_MMGLR_deep/checkpoints/")
 VERBOSE_RATE = 1000
 
-(H_train, W_train) = (128, 128)
-(H_val, W_val) = (128, 128)
+(H_train, W_train) = (256, 256)
+(H_val, W_val) = (256, 256)
 (H_test, W_test) = (496, 496)
 
 train_dataset = ImageSuperResolution(
@@ -138,10 +138,11 @@ lr_scheduler = MultiStepLR(
 ### TRAINING
 LOGGER.info("######################################################################################")
 LOGGER.info("BEGIN TRAINING PROCESS")
-# training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0024k.pt')
-# training_state = torch.load(training_state_path)
-# model.load_state_dict(training_state["model"])
-# optimizer.load_state_dict(training_state["optimizer"])
+training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0397k.pt')
+training_state = torch.load(training_state_path)
+model.load_state_dict(training_state["model"])
+optimizer.load_state_dict(training_state["optimizer"])
+lr_scheduler.load_state_dict(training_state["lr_scheduler"])
 # i_checkpoint=training_state["i"]
 
 
@@ -166,7 +167,9 @@ for epoch in range(NUM_EPOCHS):
         img_recon = np.clip(reconstruct_patchs.detach().cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
         train_mse_value = np.square(img_true- img_recon).mean()
         train_psnr = 10 * np.log10(1/train_mse_value)
-        LOGGER.info(f"iter={i} time={time.time()-s} psnr={train_psnr} mse={train_mse_value}")
+        
+        if (i%(VERBOSE_RATE//10) == 0):
+            LOGGER.info(f"iter={i} time={time.time()-s} psnr={train_psnr} mse={train_mse_value}")
 
         if (i%VERBOSE_RATE == 0):
             checkpoint = { 
