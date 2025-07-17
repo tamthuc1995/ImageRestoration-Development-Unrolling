@@ -104,28 +104,29 @@ NUM_EPOCHS = 45
 #     1,1,1,
 # ]).reshape((3,3))
 
-CONNECTION_FLAGS = np.array([
-    1,1,1,1,1,
-    1,1,1,1,1,
-    1,1,0,1,1,
-    1,1,1,1,1,
-    1,1,1,1,1,
-]).reshape((5,5))
+# CONNECTION_FLAGS = np.array([
+#     1,1,1,1,1,
+#     1,1,1,1,1,
+#     1,1,0,1,1,
+#     1,1,1,1,1,
+#     1,1,1,1,1,
+# ]).reshape((5,5))
 
-model = model_structure.MixtureGTV(
-    nchannels_in=3,
-    n_graphs=4,
-    n_node_fts=12,
-    connection_window=CONNECTION_FLAGS,
-    n_cgd_iters=6,
-    alpha_init=0.5,
-    beta_init=0.1,
-    muy_init=torch.tensor([[0.1], [0.0], [0.1], [0.0]]).to(DEVICE),
-    ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(DEVICE),
-    gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(DEVICE),
-    device=DEVICE
-)
+# model = model_structure.MixtureGTV(
+#     nchannels_in=3,
+#     n_graphs=4,
+#     n_node_fts=12,
+#     connection_window=CONNECTION_FLAGS,
+#     n_cgd_iters=6,
+#     alpha_init=0.5,
+#     beta_init=0.1,
+#     muy_init=torch.tensor([[0.1], [0.0], [0.1], [0.0]]).to(DEVICE),
+#     ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(DEVICE),
+#     gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(DEVICE),
+#     device=DEVICE
+# )
 
+model = model_structure.MultiScaleSequenceDenoiser(device=DEVICE)
 
 s = 0
 for p in model.parameters():
@@ -142,7 +143,7 @@ optimizer = Adam(
 )
 lr_scheduler = MultiStepLR(
     optimizer,
-    milestones=[100000, 200000, 300000, 400000, 500000], gamma=0.7
+    milestones=[100000, 200000, 300000, 400000], gamma=0.7
 )
 
 ### TRAINING
