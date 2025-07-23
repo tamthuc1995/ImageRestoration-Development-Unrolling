@@ -659,22 +659,10 @@ class MixtureGTV(nn.Module):
         update = system_residual + self.betaCGD[3, None, :, None, None, None] * update
         output = output + self.alphaCGD[3, None, :, None, None, None] * update
 
-        epsilon = self.soft_threshold(
-            self.GTVmodule00.op_C(output, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) + bias,
-            torch.exp(self.gamma00)
-        )
-        bias  = bias + (self.GTVmodule00.op_C(output, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) - epsilon)
-
-        left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
-        left_hand_size *= self.ro00[None, :, None, None, None]
-        left_hand_size += patchs[:, None, :, :, :]
-        ############################################################
-
-        output = left_hand_size
         system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
-        update = system_residual
+        update = system_residual + self.betaCGD[4, None, :, None, None, None] * update
         output = output + self.alphaCGD[4, None, :, None, None, None] * update
-
+        
         system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
         update = system_residual + self.betaCGD[5, None, :, None, None, None] * update
         output = output + self.alphaCGD[5, None, :, None, None, None] * update
@@ -688,7 +676,93 @@ class MixtureGTV(nn.Module):
         return output
 
     
+    # def forward(self, patchs):
+    #     # with record_function("MultiScaleMixtureGLR:forward"): 
+    #     # print("#"*80)
+    #     # patchs = patchs.permute(dims=(0, 3, 1, 2))
+    #     # patchs = patchs.contiguous()
+    #     # patchs = self.images_domain_to_abtract_domain(patchs)
+    #     # print(f"patchs.shape={patchs.shape}")
+    #     batch_size, c_size, h_size, w_size = patchs.shape
 
+    #     #####
+    #     ## Graph low pass filter
+        
+    #     list_features_patchs = self.patchs_features_extraction(patchs)
+    #     list_graph_weightGTV = [None] * self.n_levels
+    #     list_graph_weightGLR = [None] * self.n_levels
+    #     bz, nfts, h, w = list_features_patchs[0].shape
+
+    #     list_graph_weightGTV[0] = self.GTVmodule00.extract_edge_weights(
+    #         list_features_patchs[0].view((bz, self.GTVmodule00.n_graphs, self.GTVmodule00.n_node_fts, h, w))
+    #     )
+    #     list_graph_weightGLR[0] = self.GLRmodule00.extract_edge_weights(
+    #         list_features_patchs[0].view((bz, self.GLRmodule00.n_graphs, self.GLRmodule00.n_node_fts, h, w))
+    #     )
+
+    #     epsilon = self.GTVmodule00.op_C(patchs[:, None, :, :, :], list_graph_weightGTV[0][0], list_graph_weightGTV[0][1])
+    #     bias    = torch.zeros_like(epsilon)
+
+    #     left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
+    #     left_hand_size *= self.ro00[None, :, None, None, None]
+    #     left_hand_size += patchs[:, None, :, :, :]
+    #     ############################################################
+    #     output = left_hand_size
+    #     system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
+    #     update = system_residual
+    #     output = output + self.alphaCGD[0, None, :, None, None, None] * update
+
+    #     system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
+    #     update = system_residual + self.betaCGD[1, None, :, None, None, None] * update
+    #     output = output + self.alphaCGD[1, None, :, None, None, None] * update
+
+    #     epsilon = self.soft_threshold(
+    #         self.GTVmodule00.op_C(output, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) + bias,
+    #         torch.exp(self.gamma00)
+    #     )
+    #     bias  = bias + (self.GTVmodule00.op_C(output, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) - epsilon)
+
+    #     left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
+    #     left_hand_size *= self.ro00[None, :, None, None, None]
+    #     left_hand_size += patchs[:, None, :, :, :]
+    #     ############################################################
+
+    #     output = left_hand_size
+    #     system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
+    #     update = system_residual
+    #     output = output + self.alphaCGD[2, None, :, None, None, None] * update
+
+    #     system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
+    #     update = system_residual + self.betaCGD[3, None, :, None, None, None] * update
+    #     output = output + self.alphaCGD[3, None, :, None, None, None] * update
+
+    #     epsilon = self.soft_threshold(
+    #         self.GTVmodule00.op_C(output, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) + bias,
+    #         torch.exp(self.gamma00)
+    #     )
+    #     bias  = bias + (self.GTVmodule00.op_C(output, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) - epsilon)
+
+    #     left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
+    #     left_hand_size *= self.ro00[None, :, None, None, None]
+    #     left_hand_size += patchs[:, None, :, :, :]
+    #     ############################################################
+
+    #     output = left_hand_size
+    #     system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
+    #     update = system_residual
+    #     output = output + self.alphaCGD[4, None, :, None, None, None] * update
+
+    #     system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
+    #     update = system_residual + self.betaCGD[5, None, :, None, None, None] * update
+    #     output = output + self.alphaCGD[5, None, :, None, None, None] * update
+        
+
+    #     score = self.combination_weight(list_features_patchs[0])
+    #     output = torch.einsum(
+    #         "bgchw, bghw -> bchw", output, score
+    #     )
+
+    #     return output
 
 #########################################################################
 class SharpeningBlock(nn.Module):
@@ -732,51 +806,51 @@ class MultiScaleSequenceDenoiser(nn.Module):
             1,1,1,1,1,
         ]).reshape((5,5))
 
-        # self.skip_connect_weight_01 = Parameter(
-        #     torch.ones((2), dtype=torch.float32, device=device) * torch.tensor([0.1, 0.9]).to(device),
-        #     requires_grad=True
-        # )
-        # self.mixtureGLR_block01 = MixtureGTV(
-        #     nchannels_in=3,
-        #     n_graphs=4,
-        #     n_node_fts=6,
-        #     connection_window=CONNECTION_FLAGS_3x3,
-        #     n_cgd_iters=6,
-        #     alpha_init=0.5,
-        #     beta_init=0.1,
-        #     muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-        #     ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-        #     gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
-        #     device=self.device
-        # )
-        # self.sharp01 = SharpeningBlock(3, 3, 24).to(device)
+        self.skip_connect_weight01 = Parameter(
+            torch.ones((2), dtype=torch.float32, device=device) * torch.tensor([0.1, 0.9]).to(device),
+            requires_grad=True
+        )
+        self.mixtureGLR_block01 = MixtureGTV(
+            nchannels_in=3,
+            n_graphs=4,
+            n_node_fts=6,
+            connection_window=CONNECTION_FLAGS_3x3,
+            n_cgd_iters=6,
+            alpha_init=0.5,
+            beta_init=0.1,
+            muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+            ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+            gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
+            device=self.device
+        )
+        self.sharp01 = SharpeningBlock(3, 3, 24).to(device)
         
 
-        # self.skip_connect_weight_02 = Parameter(
-        #     torch.ones((2), dtype=torch.float32, device=device) * torch.tensor([0.1, 0.9]).to(device),
-        #     requires_grad=True
-        # )
-        # self.mixtureGLR_block02 = MixtureGTV(
-        #     nchannels_in=3,
-        #     n_graphs=4,
-        #     n_node_fts=6,
-        #     connection_window=CONNECTION_FLAGS_3x3,
-        #     n_cgd_iters=6,
-        #     alpha_init=0.5,
-        #     beta_init=0.1,
-        #     muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-        #     ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-        #     gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
-        #     device=self.device
-        # )
-        # self.sharp02 = SharpeningBlock(3, 3, 24).to(device)
+        self.skip_connect_weight02 = Parameter(
+            torch.ones((2), dtype=torch.float32, device=device) * torch.tensor([0.1, 0.9]).to(device),
+            requires_grad=True
+        )
+        self.mixtureGLR_block02 = MixtureGTV(
+            nchannels_in=3,
+            n_graphs=4,
+            n_node_fts=6,
+            connection_window=CONNECTION_FLAGS_3x3,
+            n_cgd_iters=6,
+            alpha_init=0.5,
+            beta_init=0.1,
+            muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+            ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+            gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
+            device=self.device
+        )
+        self.sharp02 = SharpeningBlock(3, 3, 24).to(device)
         
 
-        self.skip_connect_weight = Parameter(
+        self.skip_connect_weight03 = Parameter(
             torch.ones((2), dtype=torch.float32, device=self.device) * torch.tensor([0.1, 0.9]).to(device),
             requires_grad=True
         )
-        self.mixtureGLR_block = MixtureGTV(
+        self.mixtureGLR_block03 = MixtureGTV(
             nchannels_in=3,
             n_graphs=4,
             n_node_fts=12,
@@ -789,7 +863,7 @@ class MultiScaleSequenceDenoiser(nn.Module):
             gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
             device=self.device
         )
-        self.sharp = SharpeningBlock(3, 3, 24).to(device)
+        self.sharp03 = SharpeningBlock(3, 3, 24).to(device)
         
     
     def forward(self, patchs):
@@ -797,8 +871,14 @@ class MultiScaleSequenceDenoiser(nn.Module):
         # output = self.skip_connect_weight_01[0] * patchs + self.skip_connect_weight_01[1] * self.sharp01(self.mixtureGLR_block01(patchs))
         # output = self.skip_connect_weight_02[0] * output + self.skip_connect_weight_02[1] * self.sharp02(self.mixtureGLR_block02(output))
         
-        output = self.skip_connect_weight[0] * patchs + self.skip_connect_weight[1] * self.mixtureGLR_block(patchs)
-        output = self.sharp(output)
+        output = self.skip_connect_weight01[0] * patchs + self.skip_connect_weight01[1] * self.mixtureGLR_block01(patchs)
+        output = self.sharp01(output)
+
+        output = self.skip_connect_weight02[0] * output + self.skip_connect_weight02[1] * self.mixtureGLR_block02(output)
+        output = self.sharp02(output)
+
+        output = self.skip_connect_weight03[0] * output + self.skip_connect_weight03[1] * self.mixtureGLR_block03(output)
+        output = self.sharp03(output)
 
         return output
 

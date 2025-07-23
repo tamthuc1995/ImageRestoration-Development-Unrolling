@@ -25,7 +25,7 @@ class ImageSuperResolution(Dataset):
         csv_path,
         dist_mode="",
         lambda_noise=None,
-        patch_size=64,
+        patch_size=(64,64),
         patch_overlap_size=32,
         max_num_patchs=100000,
         root_folder="/home/dotamthuc/Works/Projects/unrollGTV/data",
@@ -68,8 +68,8 @@ class ImageSuperResolution(Dataset):
             if nchannels > 3:
                 continue
             
-            width_jumps = np.arange(0, width-self.patch_size, self.patch_size - self.patch_overlap_size)
-            height_jumps = np.arange(0, height-self.patch_size, self.patch_size - self.patch_overlap_size)
+            height_jumps = np.arange(0, height-self.patch_size[0], self.patch_size[0] - self.patch_overlap_size[0])
+            width_jumps = np.arange(0, width-self.patch_size[1], self.patch_size[1] - self.patch_overlap_size[1])
             xindex, yindex = np.meshgrid(width_jumps, height_jumps)
             xy_location = np.stack([yindex, xindex], axis=2).reshape(-1, 2)
             pdf_patchs = pd.DataFrame({
@@ -96,7 +96,7 @@ class ImageSuperResolution(Dataset):
         img = Image.open(path)
         img = np.array(img)
         
-        patch = img[row:row + self.patch_size, col: col + self.patch_size, :]
+        patch = img[row:row + self.patch_size[0], col: col + self.patch_size[1], :]
 
         h = patch.shape[0]
         w = patch.shape[1]
@@ -109,6 +109,13 @@ class ImageSuperResolution(Dataset):
         if (self.dist_mode == "addictive_noise"):
             noise = self.random_state.normal(loc=0.0, scale=self.lambda_noise / 255.0, size=(h_, w_, 3))
             patch_dist = patch + noise.astype(np.float32)
+
+        if (self.dist_mode == "vary_addictive_noise"):
+            lambda_noise_selected = self.random_state.choice(self.lambda_noise[0], p=self.lambda_noise[1])
+            # print(f"lambda_noise_selected={lambda_noise_selected}")
+            noise = self.random_state.normal(loc=0.0, scale=lambda_noise_selected / 255.0, size=(h_, w_, 3))
+            patch_dist = patch + noise.astype(np.float32)
+
 
         if (self.dist_mode == "addictive_noise_scale"):
             noise = self.random_state.normal(loc=0.0, scale=1.0, size=(h_, w_, 3))
