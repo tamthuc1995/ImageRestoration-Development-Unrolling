@@ -479,36 +479,37 @@ class FFBlock(nn.Module):
     def __init__(self, dim, num_heads, ffn_expansion_factor, bias, LayerNorm_type):
         super(FFBlock, self).__init__()
 
-        self.norm1 = LayerNorm(dim, LayerNorm_type)
+        # self.norm1 = LayerNorm(dim, LayerNorm_type)
         # self.attn = Attention(dim, num_heads, bias)
 
 
-        self.skip_connect_weight_final = Parameter(
-            torch.ones((2), dtype=torch.float32) * torch.tensor([0.5, 0.5]),
-            requires_grad=True
-        )
-        CONNECTION_FLAGS = np.array([
-            1,1,1,
-            1,0,1,
-            1,1,1,
-        ]).reshape((3,3))
-        self.mglr = MixtureGGLR(**{
-            "nchannels_in": dim,
-            "n_graphs": num_heads,
-            "n_node_fts": dim // num_heads,
-            "connection_window": CONNECTION_FLAGS,
-            "n_cgd_iters": 2,
-            "alpha_init": 0.5,
-            "beta_init": 0.1,
-            "muy_init": 0.1,
-            "device": torch.device("cpu")
-        })
+        # self.skip_connect_weight_final = Parameter(
+        #     torch.ones((2), dtype=torch.float32) * torch.tensor([0.5, 0.5]),
+        #     requires_grad=True
+        # )
+        # CONNECTION_FLAGS = np.array([
+        #     1,1,1,
+        #     1,0,1,
+        #     1,1,1,
+        # ]).reshape((3,3))
+        # self.mglr = MixtureGGLR(**{
+        #     "nchannels_in": dim,
+        #     "n_graphs": num_heads,
+        #     "n_node_fts": dim // num_heads,
+        #     "connection_window": CONNECTION_FLAGS,
+        #     "n_cgd_iters": 2,
+        #     "alpha_init": 0.5,
+        #     "beta_init": 0.1,
+        #     "muy_init": 0.1,
+        #     "device": torch.device("cpu")
+        # })
+        
         self.norm2 = LayerNorm(dim, LayerNorm_type)
         self.ffn = FeedForward(dim, ffn_expansion_factor, bias)
 
     def forward(self, x):
         # x = x + self.mglr(self.norm1(x))
-        x = self.skip_connect_weight_final[0] * x + self.skip_connect_weight_final[1] * self.mglr(x)
+        # x = self.skip_connect_weight_final[0] * x + self.skip_connect_weight_final[1] * self.mglr(x)
         x = x + self.ffn(self.norm2(x))
 
         return x

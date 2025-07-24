@@ -20,8 +20,12 @@ from torch.optim import Adam, AdamW
 #########################################################################################################
 torch.set_float32_matmul_precision('high')
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-ROOT_PROJECT = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/ImageRestoration-Development-Unrolling/"
-ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
+# ROOT_PROJECT = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/ImageRestoration-Development-Unrolling/"
+# ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
+
+ROOT_PROJECT = "/home/dotamthuc/Works/Projects/ImageRestoration-Development-Unrolling/"
+ROOT_DATASET = "/home/dotamthuc/Works/Projects/ImageRestoration-Development-Unrolling"
+
 
 #########################################################################################################
 
@@ -48,10 +52,10 @@ VERBOSE_RATE = 1000
 
 train_dataset = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
-    dist_mode="addictive_noise_scale",
-    lambda_noise=25.0,
-    patch_size=H_train,
-    patch_overlap_size=H_train//2,
+    dist_mode="vary_addictive_noise",
+    lambda_noise=[[1.0, 10.0, 15.0, 20.0, 25.0], [0.1, 0.1, 0.1, 0.1, 0.6]],
+    patch_size=(H_train, W_train),
+    patch_overlap_size=(H_train//2, W_train//2),
     max_num_patchs=1000000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
@@ -62,8 +66,8 @@ validation_dataset = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/CBSD68_testing_data_info.csv"),
     dist_mode="addictive_noise",
     lambda_noise=25.0,
-    patch_size=H_val,
-    patch_overlap_size=H_val//2,
+    patch_size=(H_val, H_val),
+    patch_overlap_size=(H_val//2, H_val//2),
     max_num_patchs=1000000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
@@ -74,8 +78,8 @@ test_dataset = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/McMaster_testing_data_info.csv"),
     dist_mode="addictive_noise",
     lambda_noise=25.0,
-    patch_size=H_test,
-    patch_overlap_size=0,
+    patch_size=(H_test, W_test),
+    patch_overlap_size=(0, 0),
     max_num_patchs=1000000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
@@ -108,10 +112,10 @@ model = model_structure.Restormer(**{
     "inp_channels":3, 
     "out_channels":3, 
     "dim": 48,
-    "num_blocks": [4,6,6,8], 
+    "num_blocks": [2,3,3,4], 
     "num_refinement_blocks": 4,
     "heads": [1,2,4,8],
-    "ffn_expansion_factor": 2.66,
+    "ffn_expansion_factor": 1.0,
     "bias": False,
     "LayerNorm_type": 'WithBias',   ## Other option 'BiasFree'
     "dual_pixel_task": False        ## True for dual-pixel defocus deblurring only. Also set inp_channels=6
@@ -148,6 +152,8 @@ for epoch in range(NUM_EPOCHS):
 
     i = 0
     ### TRAINING
+    list_train_mse = []
+    list_train_psnr = []
     for patchs_noisy, patchs_true in data_train_batched:
         s = time.time()
         optimizer.zero_grad()
@@ -162,7 +168,16 @@ for epoch in range(NUM_EPOCHS):
         img_recon = np.clip(reconstruct_patchs.detach().cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
         train_mse_value = np.square(img_true- img_recon).mean()
         train_psnr = 10 * np.log10(1/train_mse_value)
-        LOGGER.info(f"iter={i} time={time.time()-s} psnr={train_psnr} mse={train_mse_value}")
+        # LOGGER.info(f"iter={i} time={time.time()-s} psnr={train_psnr} mse={train_mse_value}")
+        list_train_psnr.append(train_psnr)
+        list_train_mse.append(train_mse_value)
+
+
+        if (i%(VERBOSE_RATE//10) == 0):
+            LOGGER.info(f"iter={i} time={time.time()-s} psnr={np.mean(list_train_psnr[-100:])} mse={np.mean(list_train_mse[-100:])}")
+            list_train_mse  = list_train_mse[-100:].copy()
+            list_train_psnr = list_train_psnr[-100:].copy()
+
 
         if (i%VERBOSE_RATE == 0):
             checkpoint = { 
