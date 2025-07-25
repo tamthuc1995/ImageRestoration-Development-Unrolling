@@ -468,26 +468,7 @@ class GTVFast(nn.Module):
         output_patchs = self.op_C_transpose(edges_signals, edge_weights, node_degree)
 
         return output_patchs
-
-
-#########################################################################
-class DCestimator(nn.Module):
-    def __init__(self, dim_in, dim_out, hidden_features):
-        super(DCestimator, self).__init__()
-
-        self.project_in = nn.Conv2d(dim_in, hidden_features*2, kernel_size=1, bias=False)
-        self.dwconv = nn.Conv2d(hidden_features*2, hidden_features*2, kernel_size=3, stride=1, padding=1, groups=hidden_features*2, bias=False)
-        self.project_out = nn.Conv2d(hidden_features, dim_out, kernel_size=1, bias=False)
-
-    def forward(self, patchs):
-
-        out = self.project_in(patchs)
-        out01, out02 = self.dwconv(out).chunk(2, dim=1)
-        out = nn.functional.gelu(out01) * out02
-        out = self.project_out(out)
-        return out
     
-
 class MixtureGTV(nn.Module):
     def __init__(self, 
             nchannels_in,
@@ -525,14 +506,12 @@ class MixtureGTV(nn.Module):
             inp_channels=3, 
             out_channels=self.n_total_fts, 
             dim = self.n_total_fts,
-            num_blocks = [2, 3, 3, 4], 
+            num_blocks = [2, 2, 2, 2], 
             num_refinement_blocks = 4,
-            ffn_expansion_factor = 2.66,
+            ffn_expansion_factor = 1,
             bias = False,
         ).to(self.device)
-        self.dc_estimator = DCestimator(self.n_total_fts, 3, self.n_total_fts*2).to(self.device)
-
-
+        
         self.combination_weight = nn.Sequential(
             nn.Conv2d(
                 in_channels=self.n_total_fts, 
@@ -644,17 +623,12 @@ class MixtureGTV(nn.Module):
             list_features_patchs[0].view((bz, self.GLRmodule00.n_graphs, self.GLRmodule00.n_node_fts, h, w))
         )
 
-        dc_term = self.dc_estimator(list_features_patchs[0])
-        y_tilde = patchs - dc_term
-        ###########################################################
-
-
-        epsilon = self.GTVmodule00.op_C(y_tilde[:, None, :, :, :], list_graph_weightGTV[0][0], list_graph_weightGTV[0][1])
+        epsilon = self.GTVmodule00.op_C(patchs[:, None, :, :, :], list_graph_weightGTV[0][0], list_graph_weightGTV[0][1])
         bias    = torch.zeros_like(epsilon)
 
         left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
         left_hand_size *= self.ro00[None, :, None, None, None]
-        left_hand_size += y_tilde[:, None, :, :, :]
+        left_hand_size += patchs[:, None, :, :, :]
         ############################################################
         output = left_hand_size
         system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
@@ -673,7 +647,7 @@ class MixtureGTV(nn.Module):
 
         left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
         left_hand_size *= self.ro00[None, :, None, None, None]
-        left_hand_size += y_tilde[:, None, :, :, :]
+        left_hand_size += patchs[:, None, :, :, :]
         ############################################################
 
         output = left_hand_size
@@ -697,7 +671,7 @@ class MixtureGTV(nn.Module):
         score = self.combination_weight(list_features_patchs[0])
         output = torch.einsum(
             "bgchw, bghw -> bchw", output, score
-        ) + dc_term
+        )
 
         return output
 
@@ -812,10 +786,17 @@ class SharpeningBlock(nn.Module):
         out = self.skip_connect_weight[0] * patchs + self.skip_connect_weight[1] * out
         return out
 
+
 class MultiScaleSequenceDenoiser(nn.Module):
     def __init__(self, device):
         super(MultiScaleSequenceDenoiser, self).__init__()
         self.device = device
+
+        CONNECTION_FLAGS_3x3= np.array([
+            1,1,1,
+            1,0,1,
+            1,1,1,
+        ]).reshape((3,3))
 
         CONNECTION_FLAGS_5x5 = np.array([
             1,1,1,1,1,
@@ -824,6 +805,46 @@ class MultiScaleSequenceDenoiser(nn.Module):
             1,1,1,1,1,
             1,1,1,1,1,
         ]).reshape((5,5))
+
+        self.skip_connect_weight01 = Parameter(
+            torch.ones((2), dtype=torch.float32, device=device) * torch.tensor([0.1, 0.9]).to(device),
+            requires_grad=True
+        )
+        self.mixtureGLR_block01 = MixtureGTV(
+            nchannels_in=3,
+            n_graphs=4,
+            n_node_fts=6,
+            connection_window=CONNECTION_FLAGS_3x3,
+            n_cgd_iters=6,
+            alpha_init=0.5,
+            beta_init=0.1,
+            muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+            ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+            gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
+            device=self.device
+        )
+        self.sharp01 = SharpeningBlock(3, 3, 24).to(device)
+        
+
+        self.skip_connect_weight02 = Parameter(
+            torch.ones((2), dtype=torch.float32, device=device) * torch.tensor([0.1, 0.9]).to(device),
+            requires_grad=True
+        )
+        self.mixtureGLR_block02 = MixtureGTV(
+            nchannels_in=3,
+            n_graphs=4,
+            n_node_fts=6,
+            connection_window=CONNECTION_FLAGS_3x3,
+            n_cgd_iters=6,
+            alpha_init=0.5,
+            beta_init=0.1,
+            muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+            ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+            gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
+            device=self.device
+        )
+        self.sharp02 = SharpeningBlock(3, 3, 24).to(device)
+        
 
         self.skip_connect_weight03 = Parameter(
             torch.ones((2), dtype=torch.float32, device=self.device) * torch.tensor([0.1, 0.9]).to(device),
@@ -842,106 +863,24 @@ class MultiScaleSequenceDenoiser(nn.Module):
             gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
             device=self.device
         )
+        self.sharp03 = SharpeningBlock(3, 3, 24).to(device)
+        
     
     def forward(self, patchs):
-        output = self.skip_connect_weight03[0] * patchs + self.skip_connect_weight03[1] * self.mixtureGLR_block03(patchs)
+
+        # output = self.skip_connect_weight_01[0] * patchs + self.skip_connect_weight_01[1] * self.sharp01(self.mixtureGLR_block01(patchs))
+        # output = self.skip_connect_weight_02[0] * output + self.skip_connect_weight_02[1] * self.sharp02(self.mixtureGLR_block02(output))
+        
+        output = self.skip_connect_weight01[0] * patchs + self.skip_connect_weight01[1] * self.mixtureGLR_block01(patchs)
+        output = self.sharp01(output)
+
+        output = self.skip_connect_weight02[0] * output + self.skip_connect_weight02[1] * self.mixtureGLR_block02(output)
+        output = self.sharp02(output)
+
+        output = self.skip_connect_weight03[0] * output + self.skip_connect_weight03[1] * self.mixtureGLR_block03(output)
+        output = self.sharp03(output)
+
         return output
-
-
-# class MultiScaleSequenceDenoiser(nn.Module):
-#     def __init__(self, device):
-#         super(MultiScaleSequenceDenoiser, self).__init__()
-#         self.device = device
-
-#         CONNECTION_FLAGS_3x3= np.array([
-#             1,1,1,
-#             1,0,1,
-#             1,1,1,
-#         ]).reshape((3,3))
-
-#         CONNECTION_FLAGS_5x5 = np.array([
-#             1,1,1,1,1,
-#             1,1,1,1,1,
-#             1,1,0,1,1,
-#             1,1,1,1,1,
-#             1,1,1,1,1,
-#         ]).reshape((5,5))
-
-#         self.skip_connect_weight01 = Parameter(
-#             torch.ones((2), dtype=torch.float32, device=device) * torch.tensor([0.1, 0.9]).to(device),
-#             requires_grad=True
-#         )
-#         self.mixtureGLR_block01 = MixtureGTV(
-#             nchannels_in=3,
-#             n_graphs=4,
-#             n_node_fts=6,
-#             connection_window=CONNECTION_FLAGS_3x3,
-#             n_cgd_iters=6,
-#             alpha_init=0.5,
-#             beta_init=0.1,
-#             muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-#             ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-#             gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
-#             device=self.device
-#         )
-#         self.sharp01 = SharpeningBlock(3, 3, 24).to(device)
-        
-
-#         self.skip_connect_weight02 = Parameter(
-#             torch.ones((2), dtype=torch.float32, device=device) * torch.tensor([0.1, 0.9]).to(device),
-#             requires_grad=True
-#         )
-#         self.mixtureGLR_block02 = MixtureGTV(
-#             nchannels_in=3,
-#             n_graphs=4,
-#             n_node_fts=6,
-#             connection_window=CONNECTION_FLAGS_3x3,
-#             n_cgd_iters=6,
-#             alpha_init=0.5,
-#             beta_init=0.1,
-#             muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-#             ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-#             gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
-#             device=self.device
-#         )
-#         self.sharp02 = SharpeningBlock(3, 3, 24).to(device)
-        
-
-#         self.skip_connect_weight03 = Parameter(
-#             torch.ones((2), dtype=torch.float32, device=self.device) * torch.tensor([0.1, 0.9]).to(device),
-#             requires_grad=True
-#         )
-#         self.mixtureGLR_block03 = MixtureGTV(
-#             nchannels_in=3,
-#             n_graphs=4,
-#             n_node_fts=12,
-#             connection_window=CONNECTION_FLAGS_5x5,
-#             n_cgd_iters=6,
-#             alpha_init=0.5,
-#             beta_init=0.1,
-#             muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-#             ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-#             gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
-#             device=self.device
-#         )
-#         self.sharp03 = SharpeningBlock(3, 3, 24).to(device)
-        
-    
-#     def forward(self, patchs):
-
-#         # output = self.skip_connect_weight_01[0] * patchs + self.skip_connect_weight_01[1] * self.sharp01(self.mixtureGLR_block01(patchs))
-#         # output = self.skip_connect_weight_02[0] * output + self.skip_connect_weight_02[1] * self.sharp02(self.mixtureGLR_block02(output))
-        
-#         output = self.skip_connect_weight01[0] * patchs + self.skip_connect_weight01[1] * self.mixtureGLR_block01(patchs)
-#         output = self.sharp01(output)
-
-#         output = self.skip_connect_weight02[0] * output + self.skip_connect_weight02[1] * self.mixtureGLR_block02(output)
-#         output = self.sharp02(output)
-
-#         output = self.skip_connect_weight03[0] * output + self.skip_connect_weight03[1] * self.mixtureGLR_block03(output)
-#         output = self.sharp03(output)
-
-#         return output
 
 
 # class MultiScaleSequenceDenoiser(nn.Module):

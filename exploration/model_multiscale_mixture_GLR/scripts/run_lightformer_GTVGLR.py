@@ -31,7 +31,7 @@ from dataloader import ImageSuperResolution
 import model_GLR_GTV_deep as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_multi_block_GLT_GTV_deep/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test20/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -40,7 +40,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_multi_block_GLT_GTV_deep/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test20/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (64, 64)
@@ -87,13 +87,13 @@ train_dataset03 = ImageSuperResolution(
     lambda_noise=[[1.0, 10.0, 15.0, 20.0, 25.0], [0.1, 0.1, 0.1, 0.1, 0.6]],
     patch_size=(H_train03,H_train03),
     patch_overlap_size=(H_train03//2,H_train03//2),
-    max_num_patchs=800000,
+    max_num_patchs=200000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
 )
 data_train_batched03 = torch.utils.data.DataLoader(
-    train_dataset03, batch_size=4, num_workers=4
+    train_dataset03, batch_size=2, num_workers=4
 )
 
 train_dataset04 = ImageSuperResolution(
@@ -102,7 +102,7 @@ train_dataset04 = ImageSuperResolution(
     lambda_noise=[[1.0, 10.0, 15.0, 20.0, 25.0], [0.1, 0.1, 0.1, 0.1, 0.6]],
     patch_size=(H_train04,H_train04),
     patch_overlap_size=(H_train04//2,H_train04//2),
-    max_num_patchs=400000,
+    max_num_patchs=200000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
@@ -159,12 +159,12 @@ LOGGER.info(f"Init model with total parameters: {s}")
 criterian = nn.L1Loss()
 optimizer = Adam(
     model.parameters(),
-    lr=0.001,
+    lr=0.0004,
     eps=1e-08
 )
 lr_scheduler = MultiStepLR(
     optimizer,
-    milestones=[200000, 500000, 700000, 900000], gamma=0.5
+    milestones=[200000, 500000, 600000, 700000], gamma=0.5
 )
 
 ### TRAINING
