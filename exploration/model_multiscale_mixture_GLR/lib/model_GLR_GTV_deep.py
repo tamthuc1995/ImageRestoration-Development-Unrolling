@@ -493,6 +493,7 @@ class MixtureGTV(nn.Module):
             nchannels_in,
             n_graphs,
             n_node_fts,
+            n_cnn_fts,
             connection_window,
             n_cgd_iters,
             alpha_init,
@@ -506,6 +507,7 @@ class MixtureGTV(nn.Module):
         self.n_graphs     = n_graphs
         self.n_node_fts   = n_node_fts
         self.n_total_fts  = n_graphs * n_node_fts
+        self.n_cnn_fts    = n_cnn_fts
         self.n_levels     = 4
         self.n_cgd_iters  = n_cgd_iters
         self.nchannels_in = nchannels_in
@@ -524,13 +526,13 @@ class MixtureGTV(nn.Module):
         self.patchs_features_extraction = FeatureExtraction(
             inp_channels=3, 
             out_channels=self.n_total_fts, 
-            dim = self.n_total_fts,
+            dim=self.n_cnn_fts,
             num_blocks = [2, 3, 3, 4], 
             num_refinement_blocks = 4,
             ffn_expansion_factor = 2.66,
             bias = False,
         ).to(self.device)
-        self.dc_estimator = DCestimator(self.n_total_fts, 3, self.n_total_fts*2).to(self.device)
+        # self.dc_estimator = DCestimator(self.n_total_fts, 3, self.n_total_fts*2).to(self.device)
 
 
         self.combination_weight = nn.Sequential(
@@ -644,17 +646,17 @@ class MixtureGTV(nn.Module):
             list_features_patchs[0].view((bz, self.GLRmodule00.n_graphs, self.GLRmodule00.n_node_fts, h, w))
         )
 
-        dc_term = self.dc_estimator(list_features_patchs[0])
-        y_tilde = patchs - dc_term
+        # dc_term = self.dc_estimator(list_features_patchs[0])
+        # y_tilde = patchs - dc_term
         ###########################################################
 
 
-        epsilon = self.GTVmodule00.op_C(y_tilde[:, None, :, :, :], list_graph_weightGTV[0][0], list_graph_weightGTV[0][1])
+        epsilon = self.GTVmodule00.op_C(patchs[:, None, :, :, :], list_graph_weightGTV[0][0], list_graph_weightGTV[0][1])
         bias    = torch.zeros_like(epsilon)
 
         left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
         left_hand_size *= self.ro00[None, :, None, None, None]
-        left_hand_size += y_tilde[:, None, :, :, :]
+        left_hand_size += patchs[:, None, :, :, :]
         ############################################################
         output = left_hand_size
         system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
@@ -673,7 +675,7 @@ class MixtureGTV(nn.Module):
 
         left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
         left_hand_size *= self.ro00[None, :, None, None, None]
-        left_hand_size += y_tilde[:, None, :, :, :]
+        left_hand_size += patchs[:, None, :, :, :]
         ############################################################
 
         output = left_hand_size
@@ -697,7 +699,7 @@ class MixtureGTV(nn.Module):
         score = self.combination_weight(list_features_patchs[0])
         output = torch.einsum(
             "bgchw, bghw -> bchw", output, score
-        ) + dc_term
+        )
 
         return output
 
@@ -831,8 +833,9 @@ class MultiScaleSequenceDenoiser(nn.Module):
         )
         self.mixtureGLR_block03 = MixtureGTV(
             nchannels_in=3,
-            n_graphs=4,
+            n_graphs=12,
             n_node_fts=12,
+            n_cnn_fts=48,
             connection_window=CONNECTION_FLAGS_5x5,
             n_cgd_iters=6,
             alpha_init=0.5,

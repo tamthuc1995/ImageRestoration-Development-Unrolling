@@ -87,7 +87,7 @@ train_dataset03 = ImageSuperResolution(
     lambda_noise=[[1.0, 10.0, 15.0, 20.0, 25.0], [0.1, 0.1, 0.1, 0.1, 0.6]],
     patch_size=(H_train03,H_train03),
     patch_overlap_size=(H_train03//2,H_train03//2),
-    max_num_patchs=200000,
+    max_num_patchs=300000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
@@ -144,7 +144,7 @@ data_test_batched = torch.utils.data.DataLoader(
     test_dataset, batch_size=1, num_workers=4
 )
 
-NUM_EPOCHS = 45
+NUM_EPOCHS = 1
 
 
 model = model_structure.MultiScaleSequenceDenoiser(device=DEVICE)
@@ -164,7 +164,7 @@ optimizer = Adam(
 )
 lr_scheduler = MultiStepLR(
     optimizer,
-    milestones=[200000, 500000, 600000, 700000], gamma=0.5
+    milestones=[200000, 500000, 650000], gamma=0.5
 )
 
 ### TRAINING
