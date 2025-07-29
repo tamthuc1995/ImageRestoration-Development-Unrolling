@@ -498,8 +498,6 @@ class MixtureGTV(nn.Module):
             ffn_expansion_factor = 2.6666,
             bias = False,
         ).to(self.device)
-        # self.dc_estimator = DCestimator(self.n_total_fts, 3, self.n_total_fts*2).to(self.device)
-
 
         self.combination_weight = nn.Sequential(
             nn.Conv2d(
@@ -612,8 +610,6 @@ class MixtureGTV(nn.Module):
             list_features_patchs[0].view((bz, self.GLRmodule00.n_graphs, self.GLRmodule00.n_node_fts, h, w))
         )
 
-        # dc_term = self.dc_estimator(list_features_patchs[0])
-        # y_tilde = patchs - dc_term
         ###########################################################
 
 
