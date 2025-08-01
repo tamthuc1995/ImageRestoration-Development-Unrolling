@@ -31,7 +31,7 @@ from dataloader import ImageSuperResolution
 import model_GLR_GTV_deep_v3 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test21/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test22/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -40,7 +40,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test21/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test22/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (64, 64)
@@ -215,7 +215,7 @@ for epoch in range(NUM_EPOCHS):
             list_train_mse  = list_train_mse[-100:].copy()
             list_train_psnr = list_train_psnr[-100:].copy()
 
-        if (i%VERBOSE_RATE == 0):
+        if (i%(5*VERBOSE_RATE) == 0):
             checkpoint = { 
                 'i': i,
                 'model': model.state_dict(),
