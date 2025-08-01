@@ -19,12 +19,59 @@ import logging
 
 # LOGGER = logging.getLogger("main")
 
+def data_augmentation(image, mode):
+    """
+    Performs data augmentation of the input image
+    Input:
+        image: a numpy array image
+        mode: int. Choice of transformation to apply to the image
+                0 - no transformation
+                1 - flip up and down
+                2 - rotate counterwise 90 degree
+                3 - rotate 90 degree and flip up and down
+                4 - rotate 180 degree
+                5 - rotate 180 degree and flip
+                6 - rotate 270 degree
+                7 - rotate 270 degree and flip
+    Using np.random.randint(0,7) for mode randomness
+    """
+    if mode == 0:
+        # original
+        out = image
+    elif mode == 1:
+        # flip up and down
+        out = np.flipud(image)
+    elif mode == 2:
+        # rotate counterwise 90 degree
+        out = np.rot90(image)
+    elif mode == 3:
+        # rotate 90 degree and flip up and down
+        out = np.rot90(image)
+        out = np.flipud(out)
+    elif mode == 4:
+        # rotate 180 degree
+        out = np.rot90(image, k=2)
+    elif mode == 5:
+        # rotate 180 degree and flip
+        out = np.rot90(image, k=2)
+        out = np.flipud(out)
+    elif mode == 6:
+        # rotate 270 degree
+        out = np.rot90(image, k=3)
+    elif mode == 7:
+        # rotate 270 degree and flip
+        out = np.rot90(image, k=3)
+        out = np.flipud(out)
+    return out.copy()
+
+
 
 class ImageSuperResolution(Dataset):
     def __init__(self, 
         csv_path,
         dist_mode="",
         lambda_noise=None,
+        use_data_aug=False,
         patch_size=(64,64),
         patch_overlap_size=32,
         max_num_patchs=100000,
@@ -40,6 +87,7 @@ class ImageSuperResolution(Dataset):
         self.device = device
         self.root_folder = root_folder
         self.lambda_noise = lambda_noise
+        self.use_data_augmentation = use_data_aug
         self.dist_mode = dist_mode
         self.logger = logger
         self.patchs_data_all = pd.DataFrame({})
@@ -105,6 +153,10 @@ class ImageSuperResolution(Dataset):
         patch = patch[0:h_, 0:w_]
 
         # patch = self.RGB2YCbCr(patch).astype(np.float32) / 255.0
+        if self.use_data_augmentation:
+            arg_mode = self.random_state.randint(0, 7)
+            patch = data_augmentation(patch, arg_mode)
+
         patch = patch.astype(np.float32) / 255.0
         if (self.dist_mode == "addictive_noise"):
             noise = self.random_state.normal(loc=0.0, scale=self.lambda_noise / 255.0, size=(h_, w_, 3))
