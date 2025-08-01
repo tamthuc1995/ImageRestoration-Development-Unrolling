@@ -491,7 +491,7 @@ class MixtureGTV(nn.Module):
 
         self.patchs_features_extraction = FeatureExtraction(
             inp_channels=3, 
-            out_channels=self.n_total_fts, 
+            out_channels=self.n_total_fts + 12, 
             dim=self.n_cnn_fts,
             num_blocks = [2, 3, 3, 4], 
             num_refinement_blocks = 4,
@@ -511,6 +511,8 @@ class MixtureGTV(nn.Module):
             ),
             nn.Softmax(dim=1)
         ).to(self.device)
+
+        self.dc_estimator = DCestimator(12, 3, 12*2).to(self.device)
 
         self.ro00 = Parameter(
             torch.ones((n_graphs), device=self.device, dtype=torch.float32) * ro_init[0],
@@ -604,21 +606,24 @@ class MixtureGTV(nn.Module):
         bz, nfts, h, w = list_features_patchs[0].shape
 
         list_graph_weightGTV[0] = self.GTVmodule00.extract_edge_weights(
-            list_features_patchs[0].view((bz, self.GTVmodule00.n_graphs, self.GTVmodule00.n_node_fts, h, w))
+            list_features_patchs[0][:, :-12, :, :].view((bz, self.GTVmodule00.n_graphs, self.GTVmodule00.n_node_fts, h, w))
         )
         list_graph_weightGLR[0] = self.GLRmodule00.extract_edge_weights(
-            list_features_patchs[0].view((bz, self.GLRmodule00.n_graphs, self.GLRmodule00.n_node_fts, h, w))
+            list_features_patchs[0][:, :-12, :, :].view((bz, self.GLRmodule00.n_graphs, self.GLRmodule00.n_node_fts, h, w))
         )
 
+
+        dc_term = self.dc_estimator(list_features_patchs[0][:, -12:, :, :])
+        y_tilde = patchs - dc_term
         ###########################################################
 
 
-        epsilon = self.GTVmodule00.op_C(patchs[:, None, :, :, :], list_graph_weightGTV[0][0], list_graph_weightGTV[0][1])
+        epsilon = self.GTVmodule00.op_C(y_tilde[:, None, :, :, :], list_graph_weightGTV[0][0], list_graph_weightGTV[0][1])
         bias    = torch.zeros_like(epsilon)
 
         left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
         left_hand_size *= self.ro00[None, :, None, None, None]
-        left_hand_size += patchs[:, None, :, :, :]
+        left_hand_size += y_tilde[:, None, :, :, :]
         ############################################################
         output = left_hand_size
         system_residual = left_hand_size -  self.apply_lightweight_transformer(output, list_graph_weightGTV, list_graph_weightGLR)
@@ -637,7 +642,7 @@ class MixtureGTV(nn.Module):
 
         left_hand_size = self.GTVmodule00.op_C_transpose(epsilon - bias, list_graph_weightGTV[0][0], list_graph_weightGTV[0][1]) 
         left_hand_size *= self.ro00[None, :, None, None, None]
-        left_hand_size += patchs[:, None, :, :, :]
+        left_hand_size += y_tilde[:, None, :, :, :]
         ############################################################
 
         output = left_hand_size
@@ -658,10 +663,10 @@ class MixtureGTV(nn.Module):
         output = output + self.alphaCGD[5, None, :, None, None, None] * update
         
 
-        score = self.combination_weight(list_features_patchs[0])
+        score = self.combination_weight(list_features_patchs[0][:, :-12, :, :])
         output = torch.einsum(
             "bgchw, bghw -> bchw", output, score
-        )
+        ) + dc_term
 
         return output
 
