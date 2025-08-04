@@ -6,6 +6,7 @@ import time
 import logging
 
 from PIL import Image
+from skimage import img_as_ubyte
 import numpy as np
 import pandas as pd
 import matplotlib.pylab as plt
@@ -28,10 +29,10 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
 from dataloader import ImageSuperResolution
-import model_GLR_GTV_deep_v3 as model_structure
+import model_GLR_GTV_deep_v4 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test22/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test23/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -40,7 +41,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test22/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test23/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (64, 64)
@@ -252,27 +253,79 @@ for epoch in range(NUM_EPOCHS):
 
         if (i%VERBOSE_RATE == 0):
 
-            # LOGGER.info(f"Start VALIDATION EPOCH {epoch} - iter={i}")
+            csv_path = os.path.join(ROOT_DATASET, "dataset/McMaster_testing_data_info.csv")
+            img_infos = pd.read_csv(csv_path, index_col='index')
 
-            # ### VALIDAING
-            model.eval()
+            paths = img_infos["path"].tolist()
+            paths = [
+                os.path.join(ROOT_DATASET,path)
+                for path in paths
+            ]
+
+            sigma_test = 25.0
+            factor = 8
             list_test_mse = []
+            random_state = np.random.RandomState(seed=2204)
             test_i = 0
-            for test_patchs_noisy, test_patchs_true in data_test_batched:
-                s = time.time()
-                with torch.no_grad():
-                    test_patchs_noisy = test_patchs_noisy.to(DEVICE)
-                    test_patchs_true = test_patchs_true.to(DEVICE) 
-                    reconstruct_patchs = model(test_patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
-                    img_true = np.clip(test_patchs_true[0].cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
-                    img_recon = np.clip(reconstruct_patchs[0].cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
-                    test_mse_value = np.square(img_true- img_recon).mean()
-                    list_test_mse.append(test_mse_value)
-                    # LOGGER.info(f"test_i={test_i} time={time.time()-s} test_i_psnr_value={10 * np.log10(1/test_mse_value)}")
-                test_i+=1
+            s = time.time()
+            for file_ in paths:
+                torch.cuda.ipc_collect()
+                torch.cuda.empty_cache()
 
-            psnr_testing = 10 * np.log10(1/np.array(list_test_mse))
-            LOGGER.info(f"FINISH TESING EPOCH {epoch} - iter={i} -  psnr_testing={np.mean(psnr_testing)}")
+                img = Image.open(file_)
+                img_true_255 = np.array(img).astype(np.float32)
+                img_true = img_true_255 / 255.0
+
+                noisy_img_raw = img_true.copy()
+                noisy_img_raw += random_state.normal(0, sigma_test/255., img_true.shape)
+
+                noisy_img = torch.from_numpy(noisy_img_raw).permute(2,0,1)
+                noisy_img = noisy_img.unsqueeze(0)
+
+                h,w = noisy_img.shape[2], noisy_img.shape[3]
+                H,W = ((h+factor)//factor)*factor, ((w+factor)//factor)*factor
+                padh = H-h if h%factor!=0 else 0
+                padw = W-w if w%factor!=0 else 0
+                noisy_img = nn.functional.pad(noisy_img, (0,padw,0,padh), 'reflect')
+
+                with torch.no_grad():
+                    restored = model(noisy_img.to(DEVICE))
+
+                restored = restored[:,:,:h,:w]
+                restored = torch.clamp(restored,0,1).cpu().detach().permute(0, 2, 3, 1).squeeze(0).numpy().copy()
+
+                restored = img_as_ubyte(restored).astype(np.float32)
+                test_mse_value = np.square(img_true_255- restored).mean()
+                list_test_mse.append(test_mse_value)
+                # print(f"test_i={test_i} time={time.time()-s} test_i_psnr_value={20 * np.log10(255.0 / np.sqrt(test_mse_value))}")  
+                test_i += 1
+                s = time.time()
+
+            psnr_testing = 20 * np.log10(255.0 / np.sqrt(list_test_mse))
+            LOGGER.info(f"FINISH TESING EPOCH {0} -  psnr_testing={np.mean(psnr_testing)}")
             model.train()
+
+
+            # LOGGER.info(f"Start VALIDATION EPOCH {epoch} - iter={i}")
+            # ### VALIDAING
+            # model.eval()
+            # list_test_mse = []
+            # test_i = 0
+            # for test_patchs_noisy, test_patchs_true in data_test_batched:
+            #     s = time.time()
+            #     with torch.no_grad():
+            #         test_patchs_noisy = test_patchs_noisy.to(DEVICE)
+            #         test_patchs_true = test_patchs_true.to(DEVICE) 
+            #         reconstruct_patchs = model(test_patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
+            #         img_true = np.clip(test_patchs_true[0].cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
+            #         img_recon = np.clip(reconstruct_patchs[0].cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
+            #         test_mse_value = np.square(img_true- img_recon).mean()
+            #         list_test_mse.append(test_mse_value)
+            #         # LOGGER.info(f"test_i={test_i} time={time.time()-s} test_i_psnr_value={10 * np.log10(1/test_mse_value)}")
+            #     test_i+=1
+
+            # psnr_testing = 10 * np.log10(1/np.array(list_test_mse))
+            # LOGGER.info(f"FINISH TESING EPOCH {epoch} - iter={i} -  psnr_testing={np.mean(psnr_testing)}")
+            # model.train()
 
         i+=1
