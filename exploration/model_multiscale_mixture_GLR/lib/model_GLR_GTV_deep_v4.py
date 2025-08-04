@@ -268,7 +268,7 @@ class FeatureExtraction(nn.Module):
         out_dec_level1 = self.output(out_dec_level1)
 
         return [out_dec_level1]
-
+    
 
 
 
@@ -349,9 +349,7 @@ class GLRFast(nn.Module):
             # img_features_frame[:, :, padH + self.edge_delta[22, 0]:padH + self.edge_delta[22, 0] + H, padW + self.edge_delta[22, 1]:padW + self.edge_delta[22, 1] + W],
             # img_features_frame[:, :, padH + self.edge_delta[23, 0]:padH + self.edge_delta[23, 0] + H, padW + self.edge_delta[23, 1]:padW + self.edge_delta[23, 1] + W]
         ], axis=-3)
-
         return neighbors_pixels_features
-    
 
     def normalize_and_transform_features(self, img_features):
         batch_size, n_graphs, n_node_fts, h_size, w_size = img_features.shape
@@ -373,7 +371,6 @@ class GLRFast(nn.Module):
 
         img_features = self.normalize_and_transform_features(img_features)
         img_features_neighbors = self.get_neighbors_pixels(img_features)
-        print(img_features_neighbors.shape)
 
         features_similarity = (img_features[:, :, None, :, :] * img_features_neighbors)
         features_similarity = features_similarity.view(
@@ -445,18 +442,43 @@ class GTVFast(nn.Module):
         _, _, H, W = img_features.shape
         padH, padW = self.pad_dim_hw
         img_features_frame = nn.functional.pad(img_features, (padW, padW, padH, padH), "replicate")
-        neighbors_pixels = []
-        for shift_h, shift_w in self.edge_delta:
-            fromh = padH + shift_h
-            toh = padH + shift_h + H
-            fromw = padW + shift_w
-            tow = padW + shift_w + W
+        # neighbors_pixels = []
+        # for shift_h, shift_w in self.edge_delta:
+        #     fromh = padH + shift_h
+        #     toh = padH + shift_h + H
+        #     fromw = padW + shift_w
+        #     tow = padW + shift_w + W
             
-            neighbors_pixels.append(
-                img_features_frame[:, :, fromh:toh, fromw:tow]
-            )
-        neighbors_pixels_features = torch.stack(neighbors_pixels, axis=-3)
-
+        #     neighbors_pixels.append(
+        #         img_features_frame[:, :, fromh:toh, fromw:tow]
+        #     )
+        # neighbors_pixels_features = torch.stack(neighbors_pixels, axis=-3)
+        neighbors_pixels_features = torch.stack([
+            img_features_frame[:, :, padH + self.edge_delta[0, 0]:padH + self.edge_delta[0, 0] + H, padW + self.edge_delta[0, 1]:padW + self.edge_delta[0, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[1, 0]:padH + self.edge_delta[1, 0] + H, padW + self.edge_delta[1, 1]:padW + self.edge_delta[1, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[2, 0]:padH + self.edge_delta[2, 0] + H, padW + self.edge_delta[2, 1]:padW + self.edge_delta[2, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[3, 0]:padH + self.edge_delta[3, 0] + H, padW + self.edge_delta[3, 1]:padW + self.edge_delta[3, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[4, 0]:padH + self.edge_delta[4, 0] + H, padW + self.edge_delta[4, 1]:padW + self.edge_delta[4, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[5, 0]:padH + self.edge_delta[5, 0] + H, padW + self.edge_delta[5, 1]:padW + self.edge_delta[5, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[6, 0]:padH + self.edge_delta[6, 0] + H, padW + self.edge_delta[6, 1]:padW + self.edge_delta[6, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[7, 0]:padH + self.edge_delta[7, 0] + H, padW + self.edge_delta[7, 1]:padW + self.edge_delta[7, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[8, 0]:padH + self.edge_delta[8, 0] + H, padW + self.edge_delta[8, 1]:padW + self.edge_delta[8, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[9, 0]:padH + self.edge_delta[9, 0] + H, padW + self.edge_delta[9, 1]:padW + self.edge_delta[9, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[10, 0]:padH + self.edge_delta[10, 0] + H, padW + self.edge_delta[10, 1]:padW + self.edge_delta[10, 1] + W],
+            img_features_frame[:, :, padH + self.edge_delta[11, 0]:padH + self.edge_delta[11, 0] + H, padW + self.edge_delta[11, 1]:padW + self.edge_delta[11, 1] + W]
+            # img_features_frame[:, :, padH + self.edge_delta[12, 0]:padH + self.edge_delta[12, 0] + H, padW + self.edge_delta[12, 1]:padW + self.edge_delta[12, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[13, 0]:padH + self.edge_delta[13, 0] + H, padW + self.edge_delta[13, 1]:padW + self.edge_delta[13, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[14, 0]:padH + self.edge_delta[14, 0] + H, padW + self.edge_delta[14, 1]:padW + self.edge_delta[14, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[15, 0]:padH + self.edge_delta[15, 0] + H, padW + self.edge_delta[15, 1]:padW + self.edge_delta[15, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[16, 0]:padH + self.edge_delta[16, 0] + H, padW + self.edge_delta[16, 1]:padW + self.edge_delta[16, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[17, 0]:padH + self.edge_delta[17, 0] + H, padW + self.edge_delta[17, 1]:padW + self.edge_delta[17, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[18, 0]:padH + self.edge_delta[18, 0] + H, padW + self.edge_delta[18, 1]:padW + self.edge_delta[18, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[19, 0]:padH + self.edge_delta[19, 0] + H, padW + self.edge_delta[19, 1]:padW + self.edge_delta[19, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[20, 0]:padH + self.edge_delta[20, 0] + H, padW + self.edge_delta[20, 1]:padW + self.edge_delta[20, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[21, 0]:padH + self.edge_delta[21, 0] + H, padW + self.edge_delta[21, 1]:padW + self.edge_delta[21, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[22, 0]:padH + self.edge_delta[22, 0] + H, padW + self.edge_delta[22, 1]:padW + self.edge_delta[22, 1] + W],
+            # img_features_frame[:, :, padH + self.edge_delta[23, 0]:padH + self.edge_delta[23, 0] + H, padW + self.edge_delta[23, 1]:padW + self.edge_delta[23, 1] + W]
+        ], axis=-3)
         return neighbors_pixels_features
     
 

@@ -191,7 +191,7 @@ for epoch in range(NUM_EPOCHS):
     ### TRAINING
     list_train_mse = []
     list_train_psnr = []
-    combined_dataloader = itertools.chain(data_train_batched01, data_train_batched02, data_train_batched03, data_train_batched04)
+    combined_dataloader = itertools.chain(data_train_batched01, data_train_batched02, data_train_batched03, data_train_batched04, data_train_batched04, data_train_batched04)
     for patchs_noisy, patchs_true in combined_dataloader:
         s = time.time()
         optimizer.zero_grad()
@@ -302,7 +302,7 @@ for epoch in range(NUM_EPOCHS):
                 s = time.time()
 
             psnr_testing = 20 * np.log10(255.0 / np.sqrt(list_test_mse))
-            LOGGER.info(f"FINISH TESING EPOCH {0} -  psnr_testing={np.mean(psnr_testing)}")
+            LOGGER.info(f"FINISH TESING EPOCH {epoch} - iter={i} -  psnr_testing={np.mean(psnr_testing)}")
             model.train()
 
 
