@@ -29,10 +29,10 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
 from dataloader import ImageSuperResolution
-import model_GLR_GTV_deep_v5 as model_structure
+import model_GLR_GTV_deep_v6 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test24/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test25/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -41,16 +41,13 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test24/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test25/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (64, 64)
 (H_train02, W_train02) = (128, 128)
 (H_train03, W_train03) = (256, 256)
 (H_train04, W_train04) = (512, 512)
-
-(H_val, W_val) = (128, 128)
-(H_test, W_test) = (496, 496)
 
 train_dataset01 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
@@ -117,37 +114,41 @@ data_train_batched04 = torch.utils.data.DataLoader(
     train_dataset04, batch_size=2, num_workers=4
 )
 
-validation_dataset = ImageSuperResolution(
-    csv_path=os.path.join(ROOT_DATASET, "dataset/CBSD68_testing_data_info.csv"),
-    dist_mode="addictive_noise",
-    lambda_noise=25.0,
-    patch_size=(H_val,H_val),
-    patch_overlap_size=(H_val//2,H_val//2),
-    max_num_patchs=1000000,
-    root_folder=ROOT_DATASET,
-    logger=LOGGER,
-    device=torch.device("cpu"),
-)
 
-test_dataset = ImageSuperResolution(
-    csv_path=os.path.join(ROOT_DATASET, "dataset/McMaster_testing_data_info.csv"),
-    dist_mode="addictive_noise",
-    lambda_noise=25.0,
-    patch_size=(H_test,H_test),
-    patch_overlap_size=(0,0),
-    max_num_patchs=1000000,
-    root_folder=ROOT_DATASET,
-    logger=LOGGER,
-    device=torch.device("cpu"),
-)
+# (H_val, W_val) = (128, 128)
+# (H_test, W_test) = (496, 496)
 
-data_valid_batched = torch.utils.data.DataLoader(
-    validation_dataset, batch_size=16, num_workers=4
-)
+# validation_dataset = ImageSuperResolution(
+#     csv_path=os.path.join(ROOT_DATASET, "dataset/CBSD68_testing_data_info.csv"),
+#     dist_mode="addictive_noise",
+#     lambda_noise=25.0,
+#     patch_size=(H_val,H_val),
+#     patch_overlap_size=(H_val//2,H_val//2),
+#     max_num_patchs=1000000,
+#     root_folder=ROOT_DATASET,
+#     logger=LOGGER,
+#     device=torch.device("cpu"),
+# )
 
-data_test_batched = torch.utils.data.DataLoader(
-    test_dataset, batch_size=1, num_workers=4
-)
+# test_dataset = ImageSuperResolution(
+#     csv_path=os.path.join(ROOT_DATASET, "dataset/McMaster_testing_data_info.csv"),
+#     dist_mode="addictive_noise",
+#     lambda_noise=25.0,
+#     patch_size=(H_test,H_test),
+#     patch_overlap_size=(0,0),
+#     max_num_patchs=1000000,
+#     root_folder=ROOT_DATASET,
+#     logger=LOGGER,
+#     device=torch.device("cpu"),
+# )
+
+# data_valid_batched = torch.utils.data.DataLoader(
+#     validation_dataset, batch_size=16, num_workers=4
+# )
+
+# data_test_batched = torch.utils.data.DataLoader(
+#     test_dataset, batch_size=1, num_workers=4
+# )
 
 NUM_EPOCHS = 1
 
@@ -226,33 +227,64 @@ for epoch in range(NUM_EPOCHS):
             torch.save(checkpoint, os.path.join(CHECKPOINT_DIR, f'checkpoints_epoch{str(epoch).zfill(2)}_iter{str(i//VERBOSE_RATE).zfill(4)}k.pt'))
 
 
-        if (i%(VERBOSE_RATE//2) == 0):
-            # LOGGER.info(f"Start VALIDATION EPOCH {epoch} - iter={i}")
-
-            # ### VALIDAING
+        if (i%VERBOSE_RATE == 0):
+            
             model.eval()
-            list_val_mse = []
-            val_i = 0
-            for val_patchs_noisy, val_patchs_true in data_valid_batched:
-                s = time.time()
+            csv_path = os.path.join(ROOT_DATASET, "dataset/CBSD68_testing_data_info.csv")
+            img_infos = pd.read_csv(csv_path, index_col='index')
+
+            paths = img_infos["path"].tolist()
+            paths = [
+                os.path.join(ROOT_DATASET,path)
+                for path in paths
+            ]
+
+            sigma_test = 25.0
+            factor = 8
+            list_test_mse = []
+            random_state = np.random.RandomState(seed=2204)
+            test_i = 0
+            s = time.time()
+            for file_ in paths:
+                torch.cuda.ipc_collect()
+                torch.cuda.empty_cache()
+
+                img = Image.open(file_)
+                img_true_255 = np.array(img).astype(np.float32)
+                img_true = img_true_255 / 255.0
+
+                noisy_img_raw = img_true.copy()
+                noisy_img_raw += random_state.normal(0, sigma_test/255., img_true.shape)
+
+                noisy_img = torch.from_numpy(noisy_img_raw).permute(2,0,1)
+                noisy_img = noisy_img.unsqueeze(0)
+
+                h,w = noisy_img.shape[2], noisy_img.shape[3]
+                H,W = ((h+factor)//factor)*factor, ((w+factor)//factor)*factor
+                padh = H-h if h%factor!=0 else 0
+                padw = W-w if w%factor!=0 else 0
+                noisy_img = nn.functional.pad(noisy_img, (0,padw,0,padh), 'reflect')
+                
                 with torch.no_grad():
-                    val_patchs_noisy = val_patchs_noisy.to(DEVICE)
-                    val_patchs_true = val_patchs_true.to(DEVICE) 
+                    restored = model(noisy_img.to(DEVICE))
 
-                    reconstruct_patchs = model(val_patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
-                    img_true = np.clip(val_patchs_true.cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
-                    img_recon = np.clip(reconstruct_patchs.cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
-                    val_mse_value = np.square(img_true- img_recon).mean()
-                    list_val_mse.append(val_mse_value)
-                    # print(f"val_i={val_i} time={time.time()-s} val_i_psnr_value={10 * np.log10(1/val_mse_value)}")
-                val_i+=1
+                restored = restored[:,:,:h,:w]
+                restored = torch.clamp(restored,0,1).cpu().detach().permute(0, 2, 3, 1).squeeze(0).numpy().copy()
 
-            psnr_validation = 10 * np.log10(1/np.array(list_val_mse))
-            LOGGER.info(f"FINISH VALIDATION EPOCH {epoch} - iter={i} -  psnr_validation={np.mean(psnr_validation)}")
+                restored = img_as_ubyte(restored).astype(np.float32)
+                test_mse_value = np.square(img_true_255- restored).mean()
+                list_test_mse.append(test_mse_value)
+                # print(f"test_i={test_i} time={time.time()-s} test_i_psnr_value={20 * np.log10(255.0 / np.sqrt(test_mse_value))}")  
+                test_i += 1
+                s = time.time()
+
+            psnr_testing = 20 * np.log10(255.0 / np.sqrt(list_test_mse))
+            LOGGER.info(f"FINISH VAL EPOCH {epoch} - iter={i} -  psnr_testing={np.mean(psnr_testing)}")
             model.train()
 
         if (i%VERBOSE_RATE == 0):
 
+            model.eval()
             csv_path = os.path.join(ROOT_DATASET, "dataset/McMaster_testing_data_info.csv")
             img_infos = pd.read_csv(csv_path, index_col='index')
 
@@ -302,30 +334,8 @@ for epoch in range(NUM_EPOCHS):
                 s = time.time()
 
             psnr_testing = 20 * np.log10(255.0 / np.sqrt(list_test_mse))
-            LOGGER.info(f"FINISH TESING EPOCH {epoch} - iter={i} -  psnr_testing={np.mean(psnr_testing)}")
+            LOGGER.info(f"FINISH TESTING EPOCH {epoch} - iter={i} -  psnr_testing={np.mean(psnr_testing)}")
             model.train()
 
-
-            # LOGGER.info(f"Start VALIDATION EPOCH {epoch} - iter={i}")
-            # ### VALIDAING
-            # model.eval()
-            # list_test_mse = []
-            # test_i = 0
-            # for test_patchs_noisy, test_patchs_true in data_test_batched:
-            #     s = time.time()
-            #     with torch.no_grad():
-            #         test_patchs_noisy = test_patchs_noisy.to(DEVICE)
-            #         test_patchs_true = test_patchs_true.to(DEVICE) 
-            #         reconstruct_patchs = model(test_patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
-            #         img_true = np.clip(test_patchs_true[0].cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
-            #         img_recon = np.clip(reconstruct_patchs[0].cpu().numpy(), a_min=0.0, a_max=1.0).astype(np.float64)
-            #         test_mse_value = np.square(img_true- img_recon).mean()
-            #         list_test_mse.append(test_mse_value)
-            #         # LOGGER.info(f"test_i={test_i} time={time.time()-s} test_i_psnr_value={10 * np.log10(1/test_mse_value)}")
-            #     test_i+=1
-
-            # psnr_testing = 10 * np.log10(1/np.array(list_test_mse))
-            # LOGGER.info(f"FINISH TESING EPOCH {epoch} - iter={i} -  psnr_testing={np.mean(psnr_testing)}")
-            # model.train()
 
         i+=1
