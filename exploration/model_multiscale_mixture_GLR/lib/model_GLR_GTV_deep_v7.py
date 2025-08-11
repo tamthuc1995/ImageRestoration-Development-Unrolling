@@ -244,7 +244,7 @@ class FeatureExtraction(nn.Module):
         latent = self.encoder_level2(inp_enc_level2)
 
         # inp_enc_level3 = self.down2_3(out_enc_level2)
-        # out_enc_level3 = self.encoder_level3(inp_enc_level3) 
+        # latent = self.encoder_level3(inp_enc_level3) 
 
         # inp_enc_level4 = self.down3_4(out_enc_level3)        
         # latent = self.latent(inp_enc_level4) 
@@ -254,7 +254,7 @@ class FeatureExtraction(nn.Module):
         # inp_dec_level3 = self.reduce_chan_level3(inp_dec_level3)
         # out_dec_level3 = self.decoder_level3(inp_dec_level3) 
 
-        # inp_dec_level2 = self.up3_2(out_dec_level3)
+        # inp_dec_level2 = self.up3_2(latent)
         # inp_dec_level2 = torch.cat([inp_dec_level2, out_enc_level2], 1)
         # inp_dec_level2 = self.reduce_chan_level2(inp_dec_level2)
         # out_dec_level2 = self.decoder_level2(inp_dec_level2) 
@@ -375,44 +375,44 @@ class GLRFast(nn.Module):
         _, _, H, W = img_features.shape
         padH, padW = self.pad_dim_hw
         img_features_frame = nn.functional.pad(img_features, (padW, padW, padH, padH), "replicate")
-        # neighbors_pixels = []
-        # for shift_h, shift_w in self.edge_delta:
-        #     fromh = padH + shift_h
-        #     toh = padH + shift_h + H
-        #     fromw = padW + shift_w
-        #     tow = padW + shift_w + W
+        neighbors_pixels = []
+        for shift_h, shift_w in self.edge_delta:
+            fromh = padH + shift_h
+            toh = padH + shift_h + H
+            fromw = padW + shift_w
+            tow = padW + shift_w + W
             
-        #     neighbors_pixels.append(
-        #         img_features_frame[:, :, fromh:toh, fromw:tow]
-        #     )
-        # neighbors_pixels_features = torch.stack(neighbors_pixels, axis=-3)
+            neighbors_pixels.append(
+                img_features_frame[:, :, fromh:toh, fromw:tow]
+            )
+        neighbors_pixels_features = torch.stack(neighbors_pixels, axis=-3)
 
-        neighbors_pixels_features = torch.stack([
-            img_features_frame[:, :, padH + self.edge_delta[0, 0]:padH + self.edge_delta[0, 0] + H, padW + self.edge_delta[0, 1]:padW + self.edge_delta[0, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[1, 0]:padH + self.edge_delta[1, 0] + H, padW + self.edge_delta[1, 1]:padW + self.edge_delta[1, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[2, 0]:padH + self.edge_delta[2, 0] + H, padW + self.edge_delta[2, 1]:padW + self.edge_delta[2, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[3, 0]:padH + self.edge_delta[3, 0] + H, padW + self.edge_delta[3, 1]:padW + self.edge_delta[3, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[4, 0]:padH + self.edge_delta[4, 0] + H, padW + self.edge_delta[4, 1]:padW + self.edge_delta[4, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[5, 0]:padH + self.edge_delta[5, 0] + H, padW + self.edge_delta[5, 1]:padW + self.edge_delta[5, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[6, 0]:padH + self.edge_delta[6, 0] + H, padW + self.edge_delta[6, 1]:padW + self.edge_delta[6, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[7, 0]:padH + self.edge_delta[7, 0] + H, padW + self.edge_delta[7, 1]:padW + self.edge_delta[7, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[8, 0]:padH + self.edge_delta[8, 0] + H, padW + self.edge_delta[8, 1]:padW + self.edge_delta[8, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[9, 0]:padH + self.edge_delta[9, 0] + H, padW + self.edge_delta[9, 1]:padW + self.edge_delta[9, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[10, 0]:padH + self.edge_delta[10, 0] + H, padW + self.edge_delta[10, 1]:padW + self.edge_delta[10, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[11, 0]:padH + self.edge_delta[11, 0] + H, padW + self.edge_delta[11, 1]:padW + self.edge_delta[11, 1] + W]
-            # img_features_frame[:, :, padH + self.edge_delta[12, 0]:padH + self.edge_delta[12, 0] + H, padW + self.edge_delta[12, 1]:padW + self.edge_delta[12, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[13, 0]:padH + self.edge_delta[13, 0] + H, padW + self.edge_delta[13, 1]:padW + self.edge_delta[13, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[14, 0]:padH + self.edge_delta[14, 0] + H, padW + self.edge_delta[14, 1]:padW + self.edge_delta[14, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[15, 0]:padH + self.edge_delta[15, 0] + H, padW + self.edge_delta[15, 1]:padW + self.edge_delta[15, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[16, 0]:padH + self.edge_delta[16, 0] + H, padW + self.edge_delta[16, 1]:padW + self.edge_delta[16, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[17, 0]:padH + self.edge_delta[17, 0] + H, padW + self.edge_delta[17, 1]:padW + self.edge_delta[17, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[18, 0]:padH + self.edge_delta[18, 0] + H, padW + self.edge_delta[18, 1]:padW + self.edge_delta[18, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[19, 0]:padH + self.edge_delta[19, 0] + H, padW + self.edge_delta[19, 1]:padW + self.edge_delta[19, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[20, 0]:padH + self.edge_delta[20, 0] + H, padW + self.edge_delta[20, 1]:padW + self.edge_delta[20, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[21, 0]:padH + self.edge_delta[21, 0] + H, padW + self.edge_delta[21, 1]:padW + self.edge_delta[21, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[22, 0]:padH + self.edge_delta[22, 0] + H, padW + self.edge_delta[22, 1]:padW + self.edge_delta[22, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[23, 0]:padH + self.edge_delta[23, 0] + H, padW + self.edge_delta[23, 1]:padW + self.edge_delta[23, 1] + W]
-        ], axis=-3)
+        # neighbors_pixels_features = torch.stack([
+        #     img_features_frame[:, :, padH + self.edge_delta[0, 0]:padH + self.edge_delta[0, 0] + H, padW + self.edge_delta[0, 1]:padW + self.edge_delta[0, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[1, 0]:padH + self.edge_delta[1, 0] + H, padW + self.edge_delta[1, 1]:padW + self.edge_delta[1, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[2, 0]:padH + self.edge_delta[2, 0] + H, padW + self.edge_delta[2, 1]:padW + self.edge_delta[2, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[3, 0]:padH + self.edge_delta[3, 0] + H, padW + self.edge_delta[3, 1]:padW + self.edge_delta[3, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[4, 0]:padH + self.edge_delta[4, 0] + H, padW + self.edge_delta[4, 1]:padW + self.edge_delta[4, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[5, 0]:padH + self.edge_delta[5, 0] + H, padW + self.edge_delta[5, 1]:padW + self.edge_delta[5, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[6, 0]:padH + self.edge_delta[6, 0] + H, padW + self.edge_delta[6, 1]:padW + self.edge_delta[6, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[7, 0]:padH + self.edge_delta[7, 0] + H, padW + self.edge_delta[7, 1]:padW + self.edge_delta[7, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[8, 0]:padH + self.edge_delta[8, 0] + H, padW + self.edge_delta[8, 1]:padW + self.edge_delta[8, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[9, 0]:padH + self.edge_delta[9, 0] + H, padW + self.edge_delta[9, 1]:padW + self.edge_delta[9, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[10, 0]:padH + self.edge_delta[10, 0] + H, padW + self.edge_delta[10, 1]:padW + self.edge_delta[10, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[11, 0]:padH + self.edge_delta[11, 0] + H, padW + self.edge_delta[11, 1]:padW + self.edge_delta[11, 1] + W]
+        #     # img_features_frame[:, :, padH + self.edge_delta[12, 0]:padH + self.edge_delta[12, 0] + H, padW + self.edge_delta[12, 1]:padW + self.edge_delta[12, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[13, 0]:padH + self.edge_delta[13, 0] + H, padW + self.edge_delta[13, 1]:padW + self.edge_delta[13, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[14, 0]:padH + self.edge_delta[14, 0] + H, padW + self.edge_delta[14, 1]:padW + self.edge_delta[14, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[15, 0]:padH + self.edge_delta[15, 0] + H, padW + self.edge_delta[15, 1]:padW + self.edge_delta[15, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[16, 0]:padH + self.edge_delta[16, 0] + H, padW + self.edge_delta[16, 1]:padW + self.edge_delta[16, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[17, 0]:padH + self.edge_delta[17, 0] + H, padW + self.edge_delta[17, 1]:padW + self.edge_delta[17, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[18, 0]:padH + self.edge_delta[18, 0] + H, padW + self.edge_delta[18, 1]:padW + self.edge_delta[18, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[19, 0]:padH + self.edge_delta[19, 0] + H, padW + self.edge_delta[19, 1]:padW + self.edge_delta[19, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[20, 0]:padH + self.edge_delta[20, 0] + H, padW + self.edge_delta[20, 1]:padW + self.edge_delta[20, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[21, 0]:padH + self.edge_delta[21, 0] + H, padW + self.edge_delta[21, 1]:padW + self.edge_delta[21, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[22, 0]:padH + self.edge_delta[22, 0] + H, padW + self.edge_delta[22, 1]:padW + self.edge_delta[22, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[23, 0]:padH + self.edge_delta[23, 0] + H, padW + self.edge_delta[23, 1]:padW + self.edge_delta[23, 1] + W]
+        # ], axis=-3)
         return neighbors_pixels_features
 
     def normalize_and_transform_features(self, img_features):
@@ -613,43 +613,43 @@ class GTVFast(nn.Module):
         _, _, H, W = img_features.shape
         padH, padW = self.pad_dim_hw
         img_features_frame = nn.functional.pad(img_features, (padW, padW, padH, padH), "replicate")
-        # neighbors_pixels = []
-        # for shift_h, shift_w in self.edge_delta:
-        #     fromh = padH + shift_h
-        #     toh = padH + shift_h + H
-        #     fromw = padW + shift_w
-        #     tow = padW + shift_w + W
+        neighbors_pixels = []
+        for shift_h, shift_w in self.edge_delta:
+            fromh = padH + shift_h
+            toh = padH + shift_h + H
+            fromw = padW + shift_w
+            tow = padW + shift_w + W
             
-        #     neighbors_pixels.append(
-        #         img_features_frame[:, :, fromh:toh, fromw:tow]
-        #     )
-        # neighbors_pixels_features = torch.stack(neighbors_pixels, axis=-3)
-        neighbors_pixels_features = torch.stack([
-            img_features_frame[:, :, padH + self.edge_delta[0, 0]:padH + self.edge_delta[0, 0] + H, padW + self.edge_delta[0, 1]:padW + self.edge_delta[0, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[1, 0]:padH + self.edge_delta[1, 0] + H, padW + self.edge_delta[1, 1]:padW + self.edge_delta[1, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[2, 0]:padH + self.edge_delta[2, 0] + H, padW + self.edge_delta[2, 1]:padW + self.edge_delta[2, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[3, 0]:padH + self.edge_delta[3, 0] + H, padW + self.edge_delta[3, 1]:padW + self.edge_delta[3, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[4, 0]:padH + self.edge_delta[4, 0] + H, padW + self.edge_delta[4, 1]:padW + self.edge_delta[4, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[5, 0]:padH + self.edge_delta[5, 0] + H, padW + self.edge_delta[5, 1]:padW + self.edge_delta[5, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[6, 0]:padH + self.edge_delta[6, 0] + H, padW + self.edge_delta[6, 1]:padW + self.edge_delta[6, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[7, 0]:padH + self.edge_delta[7, 0] + H, padW + self.edge_delta[7, 1]:padW + self.edge_delta[7, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[8, 0]:padH + self.edge_delta[8, 0] + H, padW + self.edge_delta[8, 1]:padW + self.edge_delta[8, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[9, 0]:padH + self.edge_delta[9, 0] + H, padW + self.edge_delta[9, 1]:padW + self.edge_delta[9, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[10, 0]:padH + self.edge_delta[10, 0] + H, padW + self.edge_delta[10, 1]:padW + self.edge_delta[10, 1] + W],
-            img_features_frame[:, :, padH + self.edge_delta[11, 0]:padH + self.edge_delta[11, 0] + H, padW + self.edge_delta[11, 1]:padW + self.edge_delta[11, 1] + W]
-            # img_features_frame[:, :, padH + self.edge_delta[12, 0]:padH + self.edge_delta[12, 0] + H, padW + self.edge_delta[12, 1]:padW + self.edge_delta[12, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[13, 0]:padH + self.edge_delta[13, 0] + H, padW + self.edge_delta[13, 1]:padW + self.edge_delta[13, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[14, 0]:padH + self.edge_delta[14, 0] + H, padW + self.edge_delta[14, 1]:padW + self.edge_delta[14, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[15, 0]:padH + self.edge_delta[15, 0] + H, padW + self.edge_delta[15, 1]:padW + self.edge_delta[15, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[16, 0]:padH + self.edge_delta[16, 0] + H, padW + self.edge_delta[16, 1]:padW + self.edge_delta[16, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[17, 0]:padH + self.edge_delta[17, 0] + H, padW + self.edge_delta[17, 1]:padW + self.edge_delta[17, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[18, 0]:padH + self.edge_delta[18, 0] + H, padW + self.edge_delta[18, 1]:padW + self.edge_delta[18, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[19, 0]:padH + self.edge_delta[19, 0] + H, padW + self.edge_delta[19, 1]:padW + self.edge_delta[19, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[20, 0]:padH + self.edge_delta[20, 0] + H, padW + self.edge_delta[20, 1]:padW + self.edge_delta[20, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[21, 0]:padH + self.edge_delta[21, 0] + H, padW + self.edge_delta[21, 1]:padW + self.edge_delta[21, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[22, 0]:padH + self.edge_delta[22, 0] + H, padW + self.edge_delta[22, 1]:padW + self.edge_delta[22, 1] + W],
-            # img_features_frame[:, :, padH + self.edge_delta[23, 0]:padH + self.edge_delta[23, 0] + H, padW + self.edge_delta[23, 1]:padW + self.edge_delta[23, 1] + W]
-        ], axis=-3)
+            neighbors_pixels.append(
+                img_features_frame[:, :, fromh:toh, fromw:tow]
+            )
+        neighbors_pixels_features = torch.stack(neighbors_pixels, axis=-3)
+        # neighbors_pixels_features = torch.stack([
+        #     img_features_frame[:, :, padH + self.edge_delta[0, 0]:padH + self.edge_delta[0, 0] + H, padW + self.edge_delta[0, 1]:padW + self.edge_delta[0, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[1, 0]:padH + self.edge_delta[1, 0] + H, padW + self.edge_delta[1, 1]:padW + self.edge_delta[1, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[2, 0]:padH + self.edge_delta[2, 0] + H, padW + self.edge_delta[2, 1]:padW + self.edge_delta[2, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[3, 0]:padH + self.edge_delta[3, 0] + H, padW + self.edge_delta[3, 1]:padW + self.edge_delta[3, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[4, 0]:padH + self.edge_delta[4, 0] + H, padW + self.edge_delta[4, 1]:padW + self.edge_delta[4, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[5, 0]:padH + self.edge_delta[5, 0] + H, padW + self.edge_delta[5, 1]:padW + self.edge_delta[5, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[6, 0]:padH + self.edge_delta[6, 0] + H, padW + self.edge_delta[6, 1]:padW + self.edge_delta[6, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[7, 0]:padH + self.edge_delta[7, 0] + H, padW + self.edge_delta[7, 1]:padW + self.edge_delta[7, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[8, 0]:padH + self.edge_delta[8, 0] + H, padW + self.edge_delta[8, 1]:padW + self.edge_delta[8, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[9, 0]:padH + self.edge_delta[9, 0] + H, padW + self.edge_delta[9, 1]:padW + self.edge_delta[9, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[10, 0]:padH + self.edge_delta[10, 0] + H, padW + self.edge_delta[10, 1]:padW + self.edge_delta[10, 1] + W],
+        #     img_features_frame[:, :, padH + self.edge_delta[11, 0]:padH + self.edge_delta[11, 0] + H, padW + self.edge_delta[11, 1]:padW + self.edge_delta[11, 1] + W]
+        #     # img_features_frame[:, :, padH + self.edge_delta[12, 0]:padH + self.edge_delta[12, 0] + H, padW + self.edge_delta[12, 1]:padW + self.edge_delta[12, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[13, 0]:padH + self.edge_delta[13, 0] + H, padW + self.edge_delta[13, 1]:padW + self.edge_delta[13, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[14, 0]:padH + self.edge_delta[14, 0] + H, padW + self.edge_delta[14, 1]:padW + self.edge_delta[14, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[15, 0]:padH + self.edge_delta[15, 0] + H, padW + self.edge_delta[15, 1]:padW + self.edge_delta[15, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[16, 0]:padH + self.edge_delta[16, 0] + H, padW + self.edge_delta[16, 1]:padW + self.edge_delta[16, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[17, 0]:padH + self.edge_delta[17, 0] + H, padW + self.edge_delta[17, 1]:padW + self.edge_delta[17, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[18, 0]:padH + self.edge_delta[18, 0] + H, padW + self.edge_delta[18, 1]:padW + self.edge_delta[18, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[19, 0]:padH + self.edge_delta[19, 0] + H, padW + self.edge_delta[19, 1]:padW + self.edge_delta[19, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[20, 0]:padH + self.edge_delta[20, 0] + H, padW + self.edge_delta[20, 1]:padW + self.edge_delta[20, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[21, 0]:padH + self.edge_delta[21, 0] + H, padW + self.edge_delta[21, 1]:padW + self.edge_delta[21, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[22, 0]:padH + self.edge_delta[22, 0] + H, padW + self.edge_delta[22, 1]:padW + self.edge_delta[22, 1] + W],
+        #     # img_features_frame[:, :, padH + self.edge_delta[23, 0]:padH + self.edge_delta[23, 0] + H, padW + self.edge_delta[23, 1]:padW + self.edge_delta[23, 1] + W]
+        # ], axis=-3)
         return neighbors_pixels_features
     
 
@@ -838,7 +838,7 @@ class MixtureGTV(nn.Module):
             inp_channels=3, 
             out_channels=self.n_total_fts + 12, 
             dim=self.n_cnn_fts,
-            num_blocks = [2, 3, 3, 4], 
+            num_blocks = [4, 3, 3], 
             num_refinement_blocks = 4,
             ffn_expansion_factor = 2.6666,
             bias = False,
@@ -1016,28 +1016,6 @@ class MixtureGTV(nn.Module):
         return output
 
 
-#########################################################################
-class SharpeningBlock(nn.Module):
-    def __init__(self, dim_in, dim_out, hidden_features):
-        super(SharpeningBlock, self).__init__()
-
-        self.project_in = nn.Conv2d(dim_in, hidden_features*2, kernel_size=1, bias=False)
-        self.dwconv = nn.Conv2d(hidden_features*2, hidden_features*2, kernel_size=3, stride=1, padding=1, groups=hidden_features*2, bias=False)
-        self.project_out = nn.Conv2d(hidden_features, dim_out, kernel_size=1, bias=False)
-        self.skip_connect_weight = Parameter(
-            torch.ones((2), dtype=torch.float32) * torch.tensor([0.5, 0.5]),
-            requires_grad=True
-        )
-        
-    def forward(self, patchs):
-
-        out = self.project_in(patchs)
-        out01, out02 = self.dwconv(out).chunk(2, dim=1)
-        out = nn.functional.gelu(out01) * out02
-        out = self.project_out(out)
-        out = self.skip_connect_weight[0] * patchs + self.skip_connect_weight[1] * out
-        return out
-
 class MultiScaleSequenceDenoiser(nn.Module):
     def __init__(self, device):
         super(MultiScaleSequenceDenoiser, self).__init__()
@@ -1057,15 +1035,22 @@ class MultiScaleSequenceDenoiser(nn.Module):
             0,1,1,1,0,
             0,0,1,0,0,
         ]).reshape((5,5))
-        self.skip_connect_weight02 = Parameter(
+
+        # CONNECTION_FLAGS_3x3_small = np.array([
+        #     0,1,0,
+        #     1,0,1,
+        #     0,1,0,
+        # ]).reshape((3,3))
+
+        self.skip_connect_weight03 = Parameter(
             torch.ones((2), dtype=torch.float32, device=self.device) * torch.tensor([0.1, 0.9]).to(device),
             requires_grad=True
         )
-        self.mixtureGLR_block02 = MixtureGTV(
+        self.mixtureGLR_block03 = MixtureGTV(
             nchannels_in=3,
             n_graphs=24,
             n_node_fts=3,
-            n_cnn_fts=72,
+            n_cnn_fts=128,
             connection_window=CONNECTION_FLAGS_5x5_small,
             n_cgd_iters=4,
             alpha_init=0.5,
@@ -1076,28 +1061,28 @@ class MultiScaleSequenceDenoiser(nn.Module):
             device=self.device
         )
 
-        self.skip_connect_weight03 = Parameter(
-            torch.ones((2), dtype=torch.float32, device=self.device) * torch.tensor([0.5, 0.5]).to(device),
-            requires_grad=True
-        )
-        self.mixtureGLR_block03 = MixtureGTV(
-            nchannels_in=3,
-            n_graphs=16,
-            n_node_fts=3,
-            n_cnn_fts=48,
-            connection_window=CONNECTION_FLAGS_5x5_small,
-            n_cgd_iters=4,
-            alpha_init=0.5,
-            beta_init=0.1,
-            muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-            ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
-            gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
-            device=self.device
-        )
+        # self.skip_connect_weight03 = Parameter(
+        #     torch.ones((2), dtype=torch.float32, device=self.device) * torch.tensor([0.5, 0.5]).to(device),
+        #     requires_grad=True
+        # )
+        # self.mixtureGLR_block03 = MixtureGTV(
+        #     nchannels_in=3,
+        #     n_graphs=16,
+        #     n_node_fts=3,
+        #     n_cnn_fts=32,
+        #     connection_window=CONNECTION_FLAGS_3x3_small,
+        #     n_cgd_iters=4,
+        #     alpha_init=0.5,
+        #     beta_init=0.1,
+        #     muy_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+        #     ro_init=torch.tensor([[0.1], [0.0], [0.0], [0.0]]).to(self.device),
+        #     gamma_init=torch.tensor([[0.001], [0.0], [0.0], [0.0]]).to(self.device),
+        #     device=self.device
+        # )
     
     def forward(self, patchs):
         
-        output = self.skip_connect_weight02[0] * patchs + self.skip_connect_weight02[1] * self.mixtureGLR_block03(patchs)
-        output = self.skip_connect_weight03[0] * output + self.skip_connect_weight03[1] * self.mixtureGLR_block03(output)
+        # output = self.skip_connect_weight02[0] * patchs + self.skip_connect_weight02[1] * self.mixtureGLR_block02(patchs)
+        output = self.skip_connect_weight03[0] * patchs + self.skip_connect_weight03[1] * self.mixtureGLR_block03(patchs)
         return output
 
