@@ -22,6 +22,9 @@ from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR, SequentialL
 #########################################################################################################
 torch.set_float32_matmul_precision('high')
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+torch.set_default_device(DEVICE)
+torch.autograd.set_detect_anomaly(True)
+
 ROOT_PROJECT = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/ImageRestoration-Development-Unrolling/"
 ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
@@ -29,10 +32,10 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
 from dataloader import ImageSuperResolution
-import model_GLR_GTV_deep_v9 as model_structure
+import model_GLR_GTV_deep_v10 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test27_v9/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test28_v10/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -41,7 +44,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test27_v9/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test28_v10/checkpoints/")
 VERBOSE_RATE = 1000
 
 # (H_train01, W_train01) = (64, 64)
@@ -123,7 +126,8 @@ model = model_structure.AbtractMultiScaleGraphFilter(
     n_channels_in=3, 
     n_channels_out=3, 
     dims=[48, 96, 192, 384],
-    ngraphs=[1,1,1,1],
+    nsubnets=[1, 1, 1, 1],
+    ngraphs=[1, 2, 4, 8],
     num_blocks=[4, 6, 6, 8], 
     num_blocks_out=4
 ).to(DEVICE)
@@ -137,25 +141,24 @@ for p in model.parameters():
 LOGGER.info(f"Init model with total parameters: {s}")
 
 criterian = nn.L1Loss()
-optimizer = AdamW(
+optimizer = Adam(
     model.parameters(),
-    lr=0.0008,
-    weight_decay=0.0001,
+    lr=0.0004,
     eps=1e-08
 )
 # [100000, 200000, 350000, 500000, 575000, 650000]
 lr_scheduler01 = MultiStepLR(
     optimizer,
-    milestones=[25000, 50000, 75000, 100000],
+    milestones=[13000, 25000, 37000, 50000],
     gamma=np.sqrt(np.sqrt(0.5))
 )
-lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=700000, eta_min=0.000001)
-lr_scheduler02.base_lrs = [0.0004 for group in optimizer.param_groups]
+lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=700000, eta_min=0.00001)
+lr_scheduler02.base_lrs = [0.0002 for group in optimizer.param_groups]
 
 lr_scheduler = SequentialLR(
     optimizer,
     schedulers=[lr_scheduler01, lr_scheduler02],
-    milestones=[160000],
+    milestones=[150000],
 )
 
 

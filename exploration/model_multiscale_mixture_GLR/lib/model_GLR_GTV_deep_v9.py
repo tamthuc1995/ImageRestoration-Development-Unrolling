@@ -151,23 +151,51 @@ class Downsampling(nn.Module):
     def __init__(self, dim_in, dim_out, ngraphs):
         super(Downsampling, self).__init__()
 
-        self.local_linear = nn.Conv2d(dim_in, dim_out//4, kernel_size=3, stride=1, padding=1, padding_mode="replicate", groups=ngraphs, bias=False)
-        self.local_concat = nn.PixelUnshuffle(2)
+        # self.local_linear1 = nn.Conv2d(dim_in, dim_out//2, kernel_size=3, stride=1, padding=1, padding_mode="replicate", groups=ngraphs, bias=False)
+        # self.local_linear2 = nn.Conv2d(dim_out//2, dim_out, kernel_size=2, stride=2, padding=0, groups=ngraphs, bias=False)
+        self.local_linear = nn.Conv2d(dim_in, dim_out, kernel_size=2, stride=2, padding=0, groups=ngraphs, bias=False)
 
     def forward(self, x):
-        x = self.local_concat(self.local_linear(x))
+        # x = self.local_linear2(self.local_linear1(x)
+        x = self.local_linear(x)
         return x
 
 class Upsampling(nn.Module):
     def __init__(self, dim_in, dim_out, ngraphs):
         super(Upsampling, self).__init__()
 
-        self.local_linear = nn.Conv2d(dim_in, dim_out*4, kernel_size=3, stride=1, padding=1, padding_mode="replicate", groups=ngraphs, bias=False)
-        self.local_concat = nn.PixelShuffle(2)
+        self.local_linear = nn.ConvTranspose2d(dim_in, dim_out, kernel_size=2, stride=2, padding=0, groups=ngraphs, bias=False)
+        # self.local_linear1 = nn.ConvTranspose2d(dim_in, dim_out//2, kernel_size=2, stride=2, padding=0, groups=ngraphs, bias=False)
+        # self.local_linear2 = nn.Conv2d(dim_out//2, dim_out, kernel_size=3, stride=1, padding=1, padding_mode="replicate", groups=ngraphs, bias=False)
 
     def forward(self, x):
-        x = self.local_concat(self.local_linear(x))
+        # x = self.local_linear2(self.local_linear1(x))
+        x = self.local_linear(x)
         return x
+
+# ##########################################################################
+# ## Down/Up Sampling
+# class Downsampling(nn.Module):
+#     def __init__(self, dim_in, dim_out, ngraphs):
+#         super(Downsampling, self).__init__()
+
+#         self.local_linear = nn.Conv2d(dim_in, dim_out//4, kernel_size=3, stride=1, padding=1, padding_mode="replicate", groups=ngraphs, bias=False)
+#         self.local_concat = nn.PixelUnshuffle(2)
+
+#     def forward(self, x):
+#         x = self.local_concat(self.local_linear(x))
+#         return x
+
+# class Upsampling(nn.Module):
+#     def __init__(self, dim_in, dim_out, ngraphs):
+#         super(Upsampling, self).__init__()
+
+#         self.local_linear = nn.Conv2d(dim_in, dim_out*4, kernel_size=3, stride=1, padding=1, padding_mode="replicate", groups=ngraphs, bias=False)
+#         self.local_concat = nn.PixelShuffle(2)
+
+#     def forward(self, x):
+#         x = self.local_concat(self.local_linear(x))
+#         return x
 
 # ##########################################################################
 # ## Down/Up Sampling
@@ -256,10 +284,10 @@ class AbtractMultiScaleGraphFilter(nn.Module):
             LocalLowpassFilteringBlock(dim=dims[0], ngraphs=ngraphs[0]) for i in range(num_blocks_out)
         ])
         self.linear_output = nn.Conv2d(dims[0], n_channels_out, kernel_size=1, bias=False)
-        self.skip_weight_output = Parameter(
-            torch.tensor([1.0, 1.0], dtype=torch.float32),
-            requires_grad=True
-        )
+        # self.skip_weight_output = Parameter(
+        #     torch.tensor([1.0, 1.0], dtype=torch.float32),
+        #     requires_grad=True
+        # )
     def forward(self, img):
         
         # Downward
@@ -300,7 +328,7 @@ class AbtractMultiScaleGraphFilter(nn.Module):
  
         output = self.refining_block(out_dec_scale_00)
         output = self.linear_output(output) 
-        output = self.skip_weight_output[0] * img + self.skip_weight_output[1] * output
+        # output = self.skip_weight_output[0] * img + self.skip_weight_output[1] * output
         # print(f"output={output.shape}")
 
         return output

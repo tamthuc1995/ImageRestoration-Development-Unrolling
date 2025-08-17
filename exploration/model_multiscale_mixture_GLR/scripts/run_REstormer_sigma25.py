@@ -28,7 +28,7 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 #########################################################################################################
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
-from dataloader import ImageSuperResolution
+from dataloader_v2 import ImageSuperResolution
 import baselineRestormer as model_structure
 
 
@@ -44,51 +44,48 @@ logging.basicConfig(
 CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_restormer/checkpoints/")
 VERBOSE_RATE = 1000
 
-(H_train01, W_train01) = (64, 64)
-(H_train02, W_train02) = (128, 128)
+(H_train01, W_train01) = (128, 128)
+(H_train02, W_train02) = (192, 192)
 (H_train03, W_train03) = (256, 256)
-(H_train04, W_train04) = (512, 512)
+(H_train04, W_train04) = (384, 384)
 
-# train_dataset01 = ImageSuperResolution(
-#     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
-#     dist_mode="vary_addictive_noise",
-#     lambda_noise=[[1.0, 10.0, 25.0], [0.1, 0.1, 0.8]],
-#     use_data_aug=True,
-#     patch_size=(H_train01,H_train01),
-#     patch_overlap_size=(H_train01//4,H_train01//4),
-#     max_num_patchs=3200000,
-#     root_folder=ROOT_DATASET,
-#     logger=LOGGER,
-#     device=torch.device("cpu"),
-# )
-# data_train_batched01 = torch.utils.data.DataLoader(
-#     train_dataset01, batch_size=16, num_workers=4
-# )
+train_dataset01 = ImageSuperResolution(
+    csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
+    dist_mode="addictive_noise_scale",
+    lambda_noise=25.0,
+    use_data_aug=True,
+    patch_size=(H_train01,H_train01),
+    max_num_patchs=800000,
+    root_folder=ROOT_DATASET,
+    logger=LOGGER,
+    device=torch.device("cpu"),
+)
+data_train_batched01 = torch.utils.data.DataLoader(
+    train_dataset01, batch_size=4, num_workers=4
+)
 
 train_dataset02 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
-    dist_mode="vary_addictive_noise",
-    lambda_noise=[[1.0, 10.0, 25.0], [0.1, 0.1, 0.8]],
+    dist_mode="addictive_noise_scale",
+    lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train02,H_train02),
-    patch_overlap_size=(H_train02//2,H_train02//2),
-    max_num_patchs=800000+1200000,
+    max_num_patchs=600000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
 )
 data_train_batched02 = torch.utils.data.DataLoader(
-    train_dataset02, batch_size=4, num_workers=4
+    train_dataset02, batch_size=3, num_workers=4
 )
 
 train_dataset03 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
-    dist_mode="vary_addictive_noise",
-    lambda_noise=[[1.0, 10.0, 25.0], [0.1, 0.1, 0.8]],
+    dist_mode="addictive_noise_scale",
+    lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train03,H_train03),
-    patch_overlap_size=(H_train03//2,H_train03//2),
-    max_num_patchs=300000,
+    max_num_patchs=600000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
@@ -97,22 +94,21 @@ data_train_batched03 = torch.utils.data.DataLoader(
     train_dataset03, batch_size=2, num_workers=4
 )
 
-train_dataset04 = ImageSuperResolution(
-    csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
-    dist_mode="vary_addictive_noise",
-    lambda_noise=[[1.0, 10.0, 25.0], [0.1, 0.1, 0.8]],
-    use_data_aug=True,
-    patch_size=(H_train04,H_train04),
-    patch_overlap_size=(H_train04//2,H_train04//2),
-    max_num_patchs=200000,
-    root_folder=ROOT_DATASET,
-    logger=LOGGER,
-    device=torch.device("cpu"),
-)
+# train_dataset04 = ImageSuperResolution(
+#     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
+#     dist_mode="addictive_noise_scale",
+#     lambda_noise=25.0,
+#     use_data_aug=True,
+#     patch_size=(H_train04,H_train04),
+#     max_num_patchs=150000,
+#     root_folder=ROOT_DATASET,
+#     logger=LOGGER,
+#     device=torch.device("cpu"),
+# )
 
-data_train_batched04 = torch.utils.data.DataLoader(
-    train_dataset04, batch_size=1, num_workers=4
-)
+# data_train_batched04 = torch.utils.data.DataLoader(
+#     train_dataset04, batch_size=1, num_workers=4
+# )
 
 
 
@@ -140,25 +136,23 @@ for p in model.parameters():
 LOGGER.info(f"Init model with total parameters: {s}")
 
 criterian = nn.L1Loss()
-optimizer = AdamW(
+optimizer = Adam(
     model.parameters(),
     lr=0.0006,
-    weight_decay=0.0001,
     eps=1e-08
 )
-# [100000, 200000, 350000, 500000, 575000, 650000]
 lr_scheduler01 = MultiStepLR(
     optimizer,
-    milestones=[25000, 50000, 75000, 100000],
-    gamma=np.sqrt(np.sqrt(0.5))
+    milestones=[25000, 50000],
+    gamma=np.sqrt(0.5)
 )
-lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=700000, eta_min=0.000001)
+lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=700000, eta_min=0.00001)
 lr_scheduler02.base_lrs = [0.0003 for group in optimizer.param_groups]
 
 lr_scheduler = SequentialLR(
     optimizer,
     schedulers=[lr_scheduler01, lr_scheduler02],
-    milestones=[160000],
+    milestones=[100000],
 )
 
 
@@ -183,7 +177,7 @@ for epoch in range(NUM_EPOCHS):
     ### TRAINING
     list_train_mse = []
     list_train_psnr = []
-    combined_dataloader = itertools.chain(data_train_batched02, data_train_batched03, data_train_batched04, data_train_batched04, data_train_batched04)
+    combined_dataloader = itertools.chain(data_train_batched02, data_train_batched03)
     for patchs_noisy, patchs_true in combined_dataloader:
         s = time.time()
         optimizer.zero_grad()
