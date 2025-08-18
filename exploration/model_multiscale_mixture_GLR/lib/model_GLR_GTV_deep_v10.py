@@ -711,7 +711,7 @@ class MixtureGLR(nn.Module):
                 out_channels=self.n_channels, 
                 kernel_size=1,
                 stride=1,
-                padding=1, # padding_mode="replicate",
+                padding=0, # padding_mode="replicate",
                 groups=1,
                 bias=False
             )
@@ -954,8 +954,8 @@ class AbtractMultiScaleGraphFilter(nn.Module):
             LocalNonLinearBlock(dim=dims[0], nsubnets=nsubnets[0]) for i in range(num_blocks_out)
         ])
         self.linear_output = nn.Conv2d(dims[0], n_channels_out, kernel_size=1, bias=False)
-    def forward(self, img):
-        
+    
+    def encode(self, img):
         # Downward ENCODING
         inp_enc_scale_00 = self.patch_3x3_embeding(img)
         out_enc_scale_00 = self.encoder_scale_00(inp_enc_scale_00)
@@ -969,12 +969,32 @@ class AbtractMultiScaleGraphFilter(nn.Module):
         inp_enc_scale_03 = self.down_sample_02_03(out_enc_scale_02)
         out_enc_scale_03 = self.encoder_scale_03(inp_enc_scale_03)
 
-        # FILTERING
-        out_enc_scale_00 = self.localfilter_scale_00(out_enc_scale_00)
-        out_enc_scale_01 = self.localfilter_scale_01(out_enc_scale_01)
-        out_enc_scale_02 = self.localfilter_scale_02(out_enc_scale_02)
-        out_enc_scale_03 = self.localfilter_scale_03(out_enc_scale_03)
+        return (out_enc_scale_00, out_enc_scale_01, out_enc_scale_02, out_enc_scale_03)
+    
+    def filtering(self, coefs):
+        (
+            out_enc_scale_00,
+            out_enc_scale_01,
+            out_enc_scale_02,
+            out_enc_scale_03
+        ) = coefs
 
+        # FILTERING
+        out_filtered_enc_scale_00 = self.localfilter_scale_00(out_enc_scale_00)
+        out_filtered_enc_scale_01 = self.localfilter_scale_01(out_enc_scale_01)
+        out_filtered_enc_scale_02 = self.localfilter_scale_02(out_enc_scale_02)
+        out_filtered_enc_scale_03 = self.localfilter_scale_03(out_enc_scale_03)
+
+        return (out_filtered_enc_scale_00, out_filtered_enc_scale_01, out_filtered_enc_scale_02, out_filtered_enc_scale_03)
+    
+    def decode(self, coefs):
+
+        (
+            out_enc_scale_00,
+            out_enc_scale_01,
+            out_enc_scale_02,
+            out_enc_scale_03
+        ) = coefs
 
         # Upward DECODING
         inp_dec_scale_02 = self.up_sample_03_02(out_enc_scale_03)
@@ -994,4 +1014,18 @@ class AbtractMultiScaleGraphFilter(nn.Module):
  
         output = self.refining_block(out_dec_scale_00)
         output = self.linear_output(output) 
+
+        return output
+    
+    def enc_dec(self, img):
+        coefs = self.encode(img)
+        output = self.decode(coefs)
+        return output
+
+    def forward(self, img):
+        
+        coefs = self.encode(img)
+        coefs_filtered = self.filtering(coefs)
+        output = self.decode(coefs_filtered)
+
         return output
