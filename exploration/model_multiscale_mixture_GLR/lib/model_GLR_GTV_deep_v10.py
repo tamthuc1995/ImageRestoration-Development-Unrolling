@@ -53,69 +53,69 @@ class GLRFast(nn.Module):
         self.pad_dim_hw = torch.tensor(pad_dim_hw, dtype=torch.int32)
 
 
-        # kernel01 = torch.tensor([
-        #     [0.0, 0.0, 0.0],
-        #     [0.0, 1.0, 0.0],
-        #     [0.0, 0.0, 0.0],
-        # ])
-        # kernel = []
-        # for r in range(self.n_channels):
-        #     kernel.append(kernel01[np.newaxis, np.newaxis, :, :])
+        kernel01 = torch.tensor([
+            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ])
+        kernel = []
+        for r in range(self.n_channels):
+            kernel.append(kernel01[np.newaxis, np.newaxis, :, :])
 
-        # kernel = torch.concat(kernel, axis=0)
-        # self.stats_kernel_p01 = Parameter(
-        #     torch.ones((self.n_channels, 1, 1, 1), dtype=torch.float32) * 1.0,
-        #     requires_grad=True,
-        # )
-        # self.stats_kernel01 = torch.ones((self.n_channels, 1, 3, 3), dtype=torch.float32) * kernel
+        kernel = torch.concat(kernel, axis=0)
+        self.stats_kernel_p01 = Parameter(
+            torch.ones((self.n_channels, 1, 1, 1), dtype=torch.float32) * 1.0,
+            requires_grad=True,
+        )
+        self.stats_kernel01 = torch.ones((self.n_channels, 1, 3, 3), dtype=torch.float32) * kernel
 
-        # kernel02a = torch.tensor([
-        #     [0.0, 0.0, 0.0],
-        #     [0.0,-1.0, 1.0],
-        #     [0.0, 0.0, 0.0],
-        # ])
-        # kernel = []
-        # for r in range(self.n_channels):
-        #     kernel.append(kernel02a[np.newaxis, np.newaxis, :, :])
+        kernel02a = torch.tensor([
+            [0.0, 0.0, 0.0],
+            [0.0,-1.0, 1.0],
+            [0.0, 0.0, 0.0],
+        ])
+        kernel = []
+        for r in range(self.n_channels):
+            kernel.append(kernel02a[np.newaxis, np.newaxis, :, :])
 
-        # kernel = torch.concat(kernel, axis=0)
-        # self.stats_kernel_p02a = Parameter(
-        #     torch.ones((self.n_channels, 1, 1, 1), dtype=torch.float32) * 0.5,
-        #     requires_grad=True,
-        # )
-        # self.stats_kernel02a = torch.ones((self.n_channels, 1, 3, 3), dtype=torch.float32) * kernel
+        kernel = torch.concat(kernel, axis=0)
+        self.stats_kernel_p02a = Parameter(
+            torch.ones((self.n_channels, 1, 1, 1), dtype=torch.float32) * 0.5,
+            requires_grad=True,
+        )
+        self.stats_kernel02a = torch.ones((self.n_channels, 1, 3, 3), dtype=torch.float32) * kernel
 
-        # kernel02b = torch.tensor([
-        #     [0.0, 0.0, 0.0],
-        #     [0.0,-1.0, 0.0],
-        #     [0.0, 1.0, 0.0],
-        # ])
-        # kernel = []
-        # for r in range(self.n_channels):
-        #     kernel.append(kernel02b[np.newaxis, np.newaxis, :, :])
+        kernel02b = torch.tensor([
+            [0.0, 0.0, 0.0],
+            [0.0,-1.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ])
+        kernel = []
+        for r in range(self.n_channels):
+            kernel.append(kernel02b[np.newaxis, np.newaxis, :, :])
 
-        # kernel = torch.concat(kernel, axis=0)
-        # self.stats_kernel_p02b = Parameter(
-        #     torch.ones((self.n_channels, 1, 1, 1), dtype=torch.float32) * 0.5,
-        #     requires_grad=True,
-        # )
-        # self.stats_kernel02b = torch.ones((self.n_channels, 1, 3, 3), dtype=torch.float32) * kernel
+        kernel = torch.concat(kernel, axis=0)
+        self.stats_kernel_p02b = Parameter(
+            torch.ones((self.n_channels, 1, 1, 1), dtype=torch.float32) * 0.5,
+            requires_grad=True,
+        )
+        self.stats_kernel02b = torch.ones((self.n_channels, 1, 3, 3), dtype=torch.float32) * kernel
 
-        # kernel03 = torch.tensor([
-        #     [0.0, -1.0, 0.0],
-        #     [-1.0, 4.0, -1.0],
-        #     [0.0, -1.0, 0.0],
-        # ])
-        # kernel = []
-        # for r in range(self.n_channels):
-        #     kernel.append(kernel03[np.newaxis, np.newaxis, :, :])
+        kernel03 = torch.tensor([
+            [0.0, -1.0, 0.0],
+            [-1.0, 4.0, -1.0],
+            [0.0, -1.0, 0.0],
+        ])
+        kernel = []
+        for r in range(self.n_channels):
+            kernel.append(kernel03[np.newaxis, np.newaxis, :, :])
 
-        # kernel = torch.concat(kernel, axis=0)
-        # self.stats_kernel_p03 = Parameter(
-        #     torch.ones((self.n_channels, 1, 1, 1), dtype=torch.float32) * 0.5,
-        #     requires_grad=True,
-        # )
-        # self.stats_kernel03 = torch.ones((self.n_channels, 1, 3, 3), dtype=torch.float32) * kernel
+        kernel = torch.concat(kernel, axis=0)
+        self.stats_kernel_p03 = Parameter(
+            torch.ones((self.n_channels, 1, 1, 1), dtype=torch.float32) * 0.5,
+            requires_grad=True,
+        )
+        self.stats_kernel03 = torch.ones((self.n_channels, 1, 3, 3), dtype=torch.float32) * kernel
 
         ### Trainable parameters
         # features on nodes #self.n_node_fts
@@ -169,45 +169,45 @@ class GLRFast(nn.Module):
 
         return edge_weights_norm, node_degree
     
-    # def stats_conv(self, patchs):
-    #     stats_kernel = (
-    #         self.stats_kernel_p01 * self.stats_kernel01
-    #         + self.stats_kernel_p02a * self.stats_kernel02a
-    #         + self.stats_kernel_p02b * self.stats_kernel02b
-    #         + self.stats_kernel_p03 * self.stats_kernel03
-    #     )
-    #     batch_size, n_graphs, c_size, h_size, w_size = patchs.shape
-    #     temp_patch = patchs.view(batch_size, n_graphs*c_size, h_size, w_size)
-    #     temp_patch = nn.functional.pad(temp_patch, (1,1,1,1), 'replicate')
-    #     temp_out_patch = nn.functional.conv2d(
-    #         temp_patch,
-    #         weight=stats_kernel,
-    #         stride=1,
-    #         padding=0,
-    #         groups=self.n_channels,
-    #     )
-    #     out_patch = temp_out_patch.view(batch_size, n_graphs, c_size, h_size, w_size)
-    #     return out_patch
+    def stats_conv(self, patchs):
+        stats_kernel = (
+            self.stats_kernel_p01 * self.stats_kernel01
+            + self.stats_kernel_p02a * self.stats_kernel02a
+            + self.stats_kernel_p02b * self.stats_kernel02b
+            + self.stats_kernel_p03 * self.stats_kernel03
+        )
+        batch_size, n_graphs, c_size, h_size, w_size = patchs.shape
+        temp_patch = patchs.view(batch_size, n_graphs*c_size, h_size, w_size)
+        temp_patch = nn.functional.pad(temp_patch, (1,1,1,1), 'replicate')
+        temp_out_patch = nn.functional.conv2d(
+            temp_patch,
+            weight=stats_kernel,
+            stride=1,
+            padding=0,
+            groups=self.n_channels,
+        )
+        out_patch = temp_out_patch.view(batch_size, n_graphs, c_size, h_size, w_size)
+        return out_patch
 
-    # def stats_conv_transpose(self, patchs):
+    def stats_conv_transpose(self, patchs):
 
-    #     stats_kernel = (
-    #         self.stats_kernel_p01 * self.stats_kernel01
-    #         + self.stats_kernel_p02a * self.stats_kernel02a
-    #         + self.stats_kernel_p02b * self.stats_kernel02b
-    #         + self.stats_kernel_p03 * self.stats_kernel03
-    #     )
-    #     batch_size, n_graphs, c_size, h_size, w_size = patchs.shape
-    #     temp_patch = patchs.reshape(batch_size, n_graphs*c_size, h_size, w_size)
-    #     temp_out_patch = nn.functional.conv_transpose2d(
-    #         temp_patch,
-    #         weight=stats_kernel,
-    #         stride=1,
-    #         padding=1,
-    #         groups=self.n_channels,
-    #     )
-    #     out_patch = temp_out_patch.view(batch_size, n_graphs, c_size, h_size, w_size)
-    #     return out_patch
+        stats_kernel = (
+            self.stats_kernel_p01 * self.stats_kernel01
+            + self.stats_kernel_p02a * self.stats_kernel02a
+            + self.stats_kernel_p02b * self.stats_kernel02b
+            + self.stats_kernel_p03 * self.stats_kernel03
+        )
+        batch_size, n_graphs, c_size, h_size, w_size = patchs.shape
+        temp_patch = patchs.reshape(batch_size, n_graphs*c_size, h_size, w_size)
+        temp_out_patch = nn.functional.conv_transpose2d(
+            temp_patch,
+            weight=stats_kernel,
+            stride=1,
+            padding=1,
+            groups=self.n_channels,
+        )
+        out_patch = temp_out_patch.view(batch_size, n_graphs, c_size, h_size, w_size)
+        return out_patch
 
 
     def op_L_norm(self, img_signals, edge_weights, node_degree):
@@ -225,9 +225,9 @@ class GLRFast(nn.Module):
 
     def forward(self, patchs, edge_weights, node_degree):
         # output_patchs = self.op_L_norm(patchs, edge_weights, node_degree)
-        # patchs = self.stats_conv(patchs)
+        patchs = self.stats_conv(patchs)
         output_patchs = self.op_L_norm(patchs, edge_weights, node_degree)
-        # output_patchs = self.stats_conv_transpose(output_patchs)
+        output_patchs = self.stats_conv_transpose(output_patchs)
 
         return output_patchs
     

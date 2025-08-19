@@ -35,7 +35,7 @@ from dataloader_v2 import ImageSuperResolution
 import model_GLR_GTV_deep_v10 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test28_v10/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test29_v10/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -44,7 +44,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test28_v10/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test29_v10/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (128, 128)
@@ -122,7 +122,7 @@ model = model_structure.AbtractMultiScaleGraphFilter(
     n_channels_out=3, 
     dims=[48, 96, 192, 384],
     nsubnets=[1, 1, 1, 1],
-    ngraphs=[1, 2, 4, 8],
+    ngraphs=[8, 16, 16, 32], #[1, 2, 4, 8], 
     num_blocks=[4, 6, 6, 8], 
     num_blocks_out=4
 ).to(DEVICE)
