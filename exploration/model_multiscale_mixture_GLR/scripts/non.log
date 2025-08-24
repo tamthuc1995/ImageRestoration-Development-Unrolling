@@ -66,3 +66,25 @@
 08/17/2025 02:21:26 AM: Dataset - Create total 44150 cropped images
 08/17/2025 02:22:02 AM: Dataset - Create total 838679 patchs
 08/17/2025 02:22:02 AM: Dataset - Permute and select 800000/838679 patchs
+08/19/2025 03:11:38 PM: Dataset - Create total 44150 cropped images
+08/19/2025 03:11:46 PM: Dataset - Create total 176564 patchs
+08/19/2025 03:11:46 PM: Dataset - Permute and select 150000/176564 patchs
+08/19/2025 03:12:44 PM: Clipping input data to the valid range for imshow with RGB data ([0..1] for floats or [0..255] for integers). Got range [-0.3663296..1.4247307].
+08/19/2025 03:23:20 PM: Dataset - Create total 44150 cropped images
+08/19/2025 03:23:27 PM: Dataset - Create total 176564 patchs
+08/19/2025 03:23:27 PM: Dataset - Permute and select 150000/176564 patchs
+08/19/2025 03:27:32 PM: Dataset - Create total 44150 cropped images
+08/19/2025 03:27:38 PM: Dataset - Create total 176564 patchs
+08/19/2025 03:27:38 PM: Dataset - Permute and select 150000/176564 patchs
+08/19/2025 03:28:09 PM: Dataset - Create total 44150 cropped images
+08/19/2025 03:28:16 PM: Dataset - Create total 176564 patchs
+08/19/2025 03:28:16 PM: Dataset - Permute and select 150000/176564 patchs
+08/19/2025 09:06:13 PM: Dataset - Create total 44150 cropped images
+08/19/2025 09:06:20 PM: Dataset - Create total 176564 patchs
+08/19/2025 09:06:20 PM: Dataset - Permute and select 150000/176564 patchs
+08/19/2025 09:14:28 PM: Dataset - Create total 44150 cropped images
+08/19/2025 09:14:35 PM: Dataset - Create total 176564 patchs
+08/19/2025 09:14:36 PM: Dataset - Permute and select 150000/176564 patchs
+08/19/2025 09:29:44 PM: Dataset - Create total 44150 cropped images
+08/19/2025 09:29:52 PM: Dataset - Create total 176564 patchs
+08/19/2025 09:29:52 PM: Dataset - Permute and select 150000/176564 patchs

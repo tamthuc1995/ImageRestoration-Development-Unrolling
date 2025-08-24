@@ -32,10 +32,10 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
 from dataloader_v2 import ImageSuperResolution
-import model_GLR_GTV_deep_v10 as model_structure
+import model_GLR_GTV_deep_v13 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test29_v10/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -44,7 +44,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test29_v10/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (128, 128)
@@ -88,7 +88,7 @@ train_dataset03 = ImageSuperResolution(
     lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train03,H_train03),
-    max_num_patchs=600000,
+    max_num_patchs=400000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
@@ -97,21 +97,21 @@ data_train_batched03 = torch.utils.data.DataLoader(
     train_dataset03, batch_size=2, num_workers=4
 )
 
-# train_dataset04 = ImageSuperResolution(
-#     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
-#     dist_mode="addictive_noise_scale",
-#     lambda_noise=25.0,
-#     use_data_aug=True,
-#     patch_size=(H_train04,H_train04),
-#     max_num_patchs=150000,
-#     root_folder=ROOT_DATASET,
-#     logger=LOGGER,
-#     device=torch.device("cpu"),
-# )
+train_dataset04 = ImageSuperResolution(
+    csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
+    dist_mode="addictive_noise_scale",
+    lambda_noise=25.0,
+    use_data_aug=True,
+    patch_size=(H_train04,H_train04),
+    max_num_patchs=200000,
+    root_folder=ROOT_DATASET,
+    logger=LOGGER,
+    device=torch.device("cpu"),
+)
 
-# data_train_batched04 = torch.utils.data.DataLoader(
-#     train_dataset04, batch_size=1, num_workers=4
-# )
+data_train_batched04 = torch.utils.data.DataLoader(
+    train_dataset04, batch_size=1, num_workers=4
+)
 
 
 NUM_EPOCHS = 1
@@ -141,30 +141,29 @@ loss02_weight = 0.1
 
 optimizer = Adam(
     model.parameters(),
-    lr=0.0006,
+    lr=0.0004,
     eps=1e-08
 )
-# [100000, 200000, 350000, 500000, 575000, 650000]
 lr_scheduler01 = MultiStepLR(
     optimizer,
-    milestones=[13000, 25000, 37000, 50000],
+    milestones=[50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000, 550000, 600000],
     gamma=np.sqrt(np.sqrt(0.5))
 )
-lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=700000, eta_min=0.00001)
-lr_scheduler02.base_lrs = [0.0003 for group in optimizer.param_groups]
+lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=701000, eta_min=0.000001)
+lr_scheduler02.base_lrs = [0.00005 for group in optimizer.param_groups]
 
 lr_scheduler = SequentialLR(
     optimizer,
     schedulers=[lr_scheduler01, lr_scheduler02],
-    milestones=[150000],
+    milestones=[600000],
 )
 
 
 ### TRAINING
 LOGGER.info("######################################################################################")
 LOGGER.info("BEGIN TRAINING PROCESS")
-# training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0020k.pt')
-# training_state = torch.load(training_state_path)
+# training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0400k.pt')
+# training_state = torch.load(training_state_path, weights_only=False)
 # model.load_state_dict(training_state["model"])
 # optimizer.load_state_dict(training_state["optimizer"])
 # lr_scheduler.load_state_dict(training_state["lr_scheduler"])
@@ -179,7 +178,7 @@ for epoch in range(NUM_EPOCHS):
     ### TRAINING
     list_train_mse = []
     list_train_psnr = []
-    combined_dataloader = itertools.chain(data_train_batched01, data_train_batched02, data_train_batched03)
+    combined_dataloader = itertools.chain(data_train_batched01, data_train_batched02, data_train_batched03, data_train_batched04)
     for patchs_noisy, patchs_true in combined_dataloader:
         s = time.time()
         optimizer.zero_grad()
@@ -205,7 +204,7 @@ for epoch in range(NUM_EPOCHS):
             list_train_mse  = list_train_mse[-100:].copy()
             list_train_psnr = list_train_psnr[-100:].copy()
 
-        if (i%(5*VERBOSE_RATE) == 0):
+        if ((i%(5*VERBOSE_RATE) == 0) or ((i >= 690000) and (i%(VERBOSE_RATE) == 0))):
             checkpoint = { 
                 'i': i,
                 'model': model.state_dict(),
@@ -228,7 +227,7 @@ for epoch in range(NUM_EPOCHS):
             ]
 
             sigma_test = 25.0
-            factor = 8
+            factor = 16
             list_test_mse = []
             random_state = np.random.RandomState(seed=2204)
             test_i = 0
@@ -283,7 +282,7 @@ for epoch in range(NUM_EPOCHS):
             ]
 
             sigma_test = 25.0
-            factor = 8
+            factor = 16
             list_test_mse = []
             random_state = np.random.RandomState(seed=2204)
             test_i = 0

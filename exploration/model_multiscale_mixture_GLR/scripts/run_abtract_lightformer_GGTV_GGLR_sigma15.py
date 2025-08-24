@@ -22,6 +22,9 @@ from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR, SequentialL
 #########################################################################################################
 torch.set_float32_matmul_precision('high')
 DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+torch.set_default_device(DEVICE)
+# torch.autograd.set_detect_anomaly(True)
+
 ROOT_PROJECT = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/ImageRestoration-Development-Unrolling/"
 ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
@@ -29,10 +32,10 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
 from dataloader_v2 import ImageSuperResolution
-import baselineRestormer as model_structure
+import model_GLR_GTV_deep_v12 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_restormer/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test30_v12_sigma15/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -41,7 +44,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_restormer/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test30_v12_sigma15/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (128, 128)
@@ -52,7 +55,7 @@ VERBOSE_RATE = 1000
 train_dataset01 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=25.0,
+    lambda_noise=15.0,
     use_data_aug=True,
     patch_size=(H_train01,H_train01),
     max_num_patchs=800000,
@@ -67,7 +70,7 @@ data_train_batched01 = torch.utils.data.DataLoader(
 train_dataset02 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=25.0,
+    lambda_noise=15.0,
     use_data_aug=True,
     patch_size=(H_train02,H_train02),
     max_num_patchs=600000,
@@ -82,7 +85,7 @@ data_train_batched02 = torch.utils.data.DataLoader(
 train_dataset03 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=25.0,
+    lambda_noise=15.0,
     use_data_aug=True,
     patch_size=(H_train03,H_train03),
     max_num_patchs=400000,
@@ -94,39 +97,36 @@ data_train_batched03 = torch.utils.data.DataLoader(
     train_dataset03, batch_size=2, num_workers=4
 )
 
-# train_dataset04 = ImageSuperResolution(
-#     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
-#     dist_mode="addictive_noise_scale",
-#     lambda_noise=25.0,
-#     use_data_aug=True,
-#     patch_size=(H_train04,H_train04),
-#     max_num_patchs=150000,
-#     root_folder=ROOT_DATASET,
-#     logger=LOGGER,
-#     device=torch.device("cpu"),
-# )
+train_dataset04 = ImageSuperResolution(
+    csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
+    dist_mode="addictive_noise_scale",
+    lambda_noise=15.0,
+    use_data_aug=True,
+    patch_size=(H_train04,H_train04),
+    max_num_patchs=100000,
+    root_folder=ROOT_DATASET,
+    logger=LOGGER,
+    device=torch.device("cpu"),
+)
 
-# data_train_batched04 = torch.utils.data.DataLoader(
-#     train_dataset04, batch_size=1, num_workers=4
-# )
-
+data_train_batched04 = torch.utils.data.DataLoader(
+    train_dataset04, batch_size=1, num_workers=4
+)
 
 
 NUM_EPOCHS = 1
 
 
-model = model_structure.Restormer(
-    inp_channels=3,
-    out_channels=3,
-    dim=48,
-    num_blocks=[4,6,6,8],
-    num_refinement_blocks=4,
-    heads=[1,2,4,8],
-    ffn_expansion_factor=2.66,
-    bias=False,
-    LayerNorm_type="BiasFree",
-    dual_pixel_task=False
+model = model_structure.AbtractMultiScaleGraphFilter(
+    n_channels_in=3, 
+    n_channels_out=3, 
+    dims=[48, 96, 192, 384],
+    nsubnets=[1, 1, 1, 1],
+    ngraphs=[8, 16, 16, 32], #[1, 2, 4, 8], 
+    num_blocks=[4, 6, 6, 8], 
+    num_blocks_out=4
 ).to(DEVICE)
+model.compile()
 
 s = 0
 for p in model.parameters():
@@ -135,58 +135,59 @@ for p in model.parameters():
 
 LOGGER.info(f"Init model with total parameters: {s}")
 
-criterian = nn.L1Loss()
+criterian01 = nn.L1Loss()
+criterian02 = nn.MSELoss()
+loss02_weight = 0.1
+
 optimizer = Adam(
     model.parameters(),
-    lr=0.0006,
+    lr=0.0004,
     eps=1e-08
 )
 lr_scheduler01 = MultiStepLR(
     optimizer,
-    milestones=[25000, 50000],
-    gamma=np.sqrt(0.5)
+    milestones=[50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000, 550000, 600000],
+    gamma=np.sqrt(np.sqrt(0.5))
 )
-lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=700000, eta_min=0.00001)
-lr_scheduler02.base_lrs = [0.0003 for group in optimizer.param_groups]
+lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=700000, eta_min=0.000001)
+lr_scheduler02.base_lrs = [0.00005 for group in optimizer.param_groups]
 
 lr_scheduler = SequentialLR(
     optimizer,
     schedulers=[lr_scheduler01, lr_scheduler02],
-    milestones=[100000],
+    milestones=[600000],
 )
-
 
 
 ### TRAINING
 LOGGER.info("######################################################################################")
 LOGGER.info("BEGIN TRAINING PROCESS")
-training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0495k.pt')
+training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0200k.pt')
 training_state = torch.load(training_state_path, weights_only=False)
 model.load_state_dict(training_state["model"])
 optimizer.load_state_dict(training_state["optimizer"])
 lr_scheduler.load_state_dict(training_state["lr_scheduler"])
 i=training_state["i"]
-
+# i = 0
 
 
 for epoch in range(NUM_EPOCHS):
 
     model.train()
 
-    # i = 0
     ### TRAINING
     list_train_mse = []
     list_train_psnr = []
-    combined_dataloader = itertools.chain(data_train_batched03)
+    combined_dataloader = itertools.chain(data_train_batched01, data_train_batched02, data_train_batched03, data_train_batched04)
     for patchs_noisy, patchs_true in combined_dataloader:
         s = time.time()
         optimizer.zero_grad()
         patchs_noisy = patchs_noisy.to(DEVICE)
         patchs_true = patchs_true.to(DEVICE) 
         reconstruct_patchs = model(patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
-        loss_value = criterian(reconstruct_patchs, patchs_true)
+        reconstruct_patchs_true = model.enc_dec(patchs_true.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
+        loss_value = criterian01(reconstruct_patchs, patchs_true) + loss02_weight * criterian02(reconstruct_patchs_true, patchs_true)
         loss_value.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
         optimizer.step()
         lr_scheduler.step()
 
@@ -225,8 +226,8 @@ for epoch in range(NUM_EPOCHS):
                 for path in paths
             ]
 
-            sigma_test = 25.0
-            factor = 8
+            sigma_test = 15.0
+            factor = 16
             list_test_mse = []
             random_state = np.random.RandomState(seed=2204)
             test_i = 0
@@ -280,8 +281,8 @@ for epoch in range(NUM_EPOCHS):
                 for path in paths
             ]
 
-            sigma_test = 25.0
-            factor = 8
+            sigma_test = 15.0
+            factor = 16
             list_test_mse = []
             random_state = np.random.RandomState(seed=2204)
             test_i = 0

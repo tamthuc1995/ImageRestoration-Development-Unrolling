@@ -3,6 +3,7 @@ import os
 
 from PIL import Image
 import numpy as np
+import cv2
 
 import pandas as pd
 import matplotlib.pylab as plt
@@ -169,11 +170,18 @@ class ImageSuperResolution(Dataset):
                     patchs = {
                         "row": row + self.random_state.randint(0, height - self.patch_size[0]),
                         "col": col + self.random_state.randint(0, width - self.patch_size[1]),
+                        "padding": False, 
                         "path": img_info["path"]
                     }
                     list_pdf_per_img.append(patchs)
                 else:
-                    assert False, "patch_size too big"
+                    patchs = {
+                        "row": row,
+                        "col": col,
+                        "padding": True, 
+                        "path": img_info["path"]
+                    }
+                    list_pdf_per_img.append(patchs)
 
         self.patchs_data_all = pd.DataFrame(list_pdf_per_img)
         self.logger.info(f"Dataset - Create total {self.patchs_data_all.shape[0]} patchs")
@@ -184,16 +192,22 @@ class ImageSuperResolution(Dataset):
         self.patchs_data = self.patchs_data_all.iloc[ind].copy()
 
     def __getitem__(self, idx):
-        row, col, path = tuple(self.patchs_data.iloc[idx])
+        row, col, need_padding, path = tuple(self.patchs_data.iloc[idx])
         img = Image.open(path)
         img = np.array(img)
-
-        patch = img[row:row + self.patch_size[0], col: col + self.patch_size[1], :]
+        if need_padding:
+            patch = img[row:row + self.patch_size[0], col: col + self.patch_size[1], :]
+            h, w, c = patch.shape 
+            h_pad = self.patch_size[0] - h
+            w_pad = self.patch_size[1] - w
+            patch = cv2.copyMakeBorder(patch, 0, h_pad, 0, w_pad, cv2.BORDER_REFLECT)
+        else:
+            patch = img[row:row + self.patch_size[0], col: col + self.patch_size[1], :]
 
         h = patch.shape[0]
         w = patch.shape[1]
-        h_ = (h//8) * 8
-        w_ = (w//8) * 8
+        h_ = (h//16) * 16
+        w_ = (w//16) * 16
         patch = patch[0:h_, 0:w_]
 
         # patch = self.RGB2YCbCr(patch).astype(np.float32) / 255.0
