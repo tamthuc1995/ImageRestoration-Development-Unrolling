@@ -21,7 +21,7 @@ from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR, SequentialL
 
 #########################################################################################################
 torch.set_float32_matmul_precision('high')
-DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.set_default_device(DEVICE)
 # torch.autograd.set_detect_anomaly(True)
 
@@ -31,11 +31,11 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 #########################################################################################################
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
-from dataloader_v2 import ImageSuperResolution
+from dataloader_v3 import ImageSuperResolution
 import model_GLR_GTV_deep_v13 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_sigma15/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test32_v14/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -44,7 +44,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_sigma15/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test32_v14/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (128, 128)
@@ -55,7 +55,7 @@ VERBOSE_RATE = 1000
 train_dataset01 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=15.0,
+    lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train01,H_train01),
     max_num_patchs=800000,
@@ -70,13 +70,14 @@ data_train_batched01 = torch.utils.data.DataLoader(
 train_dataset02 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=15.0,
+    lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train02,H_train02),
     max_num_patchs=600000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
+    seed=2224
 )
 data_train_batched02 = torch.utils.data.DataLoader(
     train_dataset02, batch_size=3, num_workers=4
@@ -85,7 +86,7 @@ data_train_batched02 = torch.utils.data.DataLoader(
 train_dataset03 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=15.0,
+    lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train03,H_train03),
     max_num_patchs=400000,
@@ -100,10 +101,10 @@ data_train_batched03 = torch.utils.data.DataLoader(
 train_dataset04 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=15.0,
+    lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train04,H_train04),
-    max_num_patchs=100000,
+    max_num_patchs=200000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
@@ -150,7 +151,7 @@ lr_scheduler01 = MultiStepLR(
     milestones=[50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000, 550000, 600000],
     gamma=np.sqrt(np.sqrt(0.5))
 )
-lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=700000, eta_min=0.000001)
+lr_scheduler02 = CosineAnnealingLR(optimizer, T_max=701000, eta_min=0.000001)
 lr_scheduler02.base_lrs = [0.00005 for group in optimizer.param_groups]
 
 lr_scheduler = SequentialLR(
@@ -163,7 +164,7 @@ lr_scheduler = SequentialLR(
 ### TRAINING
 LOGGER.info("######################################################################################")
 LOGGER.info("BEGIN TRAINING PROCESS")
-# training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0200k.pt')
+# training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0330k.pt')
 # training_state = torch.load(training_state_path, weights_only=False)
 # model.load_state_dict(training_state["model"])
 # optimizer.load_state_dict(training_state["optimizer"])
@@ -189,6 +190,7 @@ for epoch in range(NUM_EPOCHS):
         reconstruct_patchs_true = model.enc_dec(patchs_true.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
         loss_value = criterian01(reconstruct_patchs, patchs_true) + loss02_weight * criterian02(reconstruct_patchs_true, patchs_true)
         loss_value.backward()
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
         optimizer.step()
         lr_scheduler.step()
 
@@ -205,7 +207,7 @@ for epoch in range(NUM_EPOCHS):
             list_train_mse  = list_train_mse[-100:].copy()
             list_train_psnr = list_train_psnr[-100:].copy()
 
-        if (i%(5*VERBOSE_RATE) == 0):
+        if ((i%(5*VERBOSE_RATE) == 0) or ((i >= 690000) and (i%(VERBOSE_RATE) == 0))):
             checkpoint = { 
                 'i': i,
                 'model': model.state_dict(),
@@ -227,7 +229,7 @@ for epoch in range(NUM_EPOCHS):
                 for path in paths
             ]
 
-            sigma_test = 15.0
+            sigma_test = 25.0
             factor = 16
             list_test_mse = []
             random_state = np.random.RandomState(seed=2204)
@@ -246,6 +248,7 @@ for epoch in range(NUM_EPOCHS):
 
                 noisy_img = torch.from_numpy(noisy_img_raw).permute(2,0,1)
                 noisy_img = noisy_img.unsqueeze(0)
+                noisy_img_raw = np.clip(noisy_img_raw, a_min=0.0, a_max=1.0)
 
                 h,w = noisy_img.shape[2], noisy_img.shape[3]
                 H,W = ((h+factor)//factor)*factor, ((w+factor)//factor)*factor
@@ -282,7 +285,7 @@ for epoch in range(NUM_EPOCHS):
                 for path in paths
             ]
 
-            sigma_test = 15.0
+            sigma_test = 25.0
             factor = 16
             list_test_mse = []
             random_state = np.random.RandomState(seed=2204)
@@ -298,6 +301,7 @@ for epoch in range(NUM_EPOCHS):
 
                 noisy_img_raw = img_true.copy()
                 noisy_img_raw += random_state.normal(0, sigma_test/255., img_true.shape)
+                noisy_img_raw = np.clip(noisy_img_raw, a_min=0.0, a_max=1.0)
 
                 noisy_img = torch.from_numpy(noisy_img_raw).permute(2,0,1)
                 noisy_img = noisy_img.unsqueeze(0)

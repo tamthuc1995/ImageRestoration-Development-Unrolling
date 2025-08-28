@@ -35,7 +35,7 @@ from dataloader_v2 import ImageSuperResolution
 import model_GLR_GTV_deep_v13 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_sigma15/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_sigma50/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -44,7 +44,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_sigma15/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_sigma50/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (128, 128)
@@ -55,7 +55,7 @@ VERBOSE_RATE = 1000
 train_dataset01 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=15.0,
+    lambda_noise=50.0,
     use_data_aug=True,
     patch_size=(H_train01,H_train01),
     max_num_patchs=800000,
@@ -70,7 +70,7 @@ data_train_batched01 = torch.utils.data.DataLoader(
 train_dataset02 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=15.0,
+    lambda_noise=50.0,
     use_data_aug=True,
     patch_size=(H_train02,H_train02),
     max_num_patchs=600000,
@@ -85,7 +85,7 @@ data_train_batched02 = torch.utils.data.DataLoader(
 train_dataset03 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=15.0,
+    lambda_noise=50.0,
     use_data_aug=True,
     patch_size=(H_train03,H_train03),
     max_num_patchs=400000,
@@ -100,7 +100,7 @@ data_train_batched03 = torch.utils.data.DataLoader(
 train_dataset04 = ImageSuperResolution(
     csv_path=os.path.join(ROOT_DATASET, "dataset/DFWB_training_data_info.csv"),
     dist_mode="addictive_noise_scale",
-    lambda_noise=15.0,
+    lambda_noise=50.0,
     use_data_aug=True,
     patch_size=(H_train04,H_train04),
     max_num_patchs=100000,
@@ -227,7 +227,7 @@ for epoch in range(NUM_EPOCHS):
                 for path in paths
             ]
 
-            sigma_test = 15.0
+            sigma_test = 50.0
             factor = 16
             list_test_mse = []
             random_state = np.random.RandomState(seed=2204)
@@ -282,7 +282,7 @@ for epoch in range(NUM_EPOCHS):
                 for path in paths
             ]
 
-            sigma_test = 15.0
+            sigma_test = 50.0
             factor = 16
             list_test_mse = []
             random_state = np.random.RandomState(seed=2204)

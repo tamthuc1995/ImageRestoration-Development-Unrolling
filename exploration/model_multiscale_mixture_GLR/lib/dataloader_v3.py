@@ -109,47 +109,46 @@ class ImageSuperResolution(Dataset):
         return skimage.color.ycbcr2rgb(ycbcr)
     
     def create_all_images(self):
-        img_size = 512
-        overlap = 96
-        max_size = 800
+        CONSISTENT_SIZE = 512
+        OVERLAP = 96
+        MAX_SIZE = 800
         list_pdf_per_img = []
         for i in range(self.img_infos.shape[0]):
             img_info = self.img_infos.loc[i]
             height = img_info["height"]
             width  = img_info["width"]
             nchannels  = img_info["nchannels"]
-            if (width > max_size) and (height > max_size):
-                height_jumps = np.arange(0, height-img_size, img_size - overlap)
-                width_jumps = np.arange(0, width-img_size, img_size - overlap)
-                xindex, yindex = np.meshgrid(width_jumps, height_jumps)
-                xy_location = np.stack([yindex, xindex], axis=2).reshape(-1, 2)
-                pdf_patchs = pd.DataFrame({
-                    "row": xy_location[:, 0],
-                    "col": xy_location[:, 1],
-                })
-                pdf_patchs["height"] = img_size
-                pdf_patchs["width"] = img_size
-                pdf_patchs["nchannels"] = nchannels
-                pdf_patchs["path"] = os.path.join(
-                    self.root_folder,
-                    img_info["path"]
-                )
-                list_pdf_per_img.append(pdf_patchs)
+            if (width > MAX_SIZE) and (height > MAX_SIZE):
+                if height >= width:
+                    new_height, new_width = int(CONSISTENT_SIZE * (height / width)), CONSISTENT_SIZE
+                else:
+                    new_height, new_width = CONSISTENT_SIZE, int(CONSISTENT_SIZE * (width / height))
+            
+                pdf_patchs = {
+                    "resize": True,
+                    "height": new_height,
+                    "width" : new_width,
+                    "nchannels": nchannels,
+                    "path"  : os.path.join(
+                        self.root_folder,
+                        img_info["path"]
+                    )
+                }
+                # list_pdf_per_img.append(pdf_patchs)
             else:
-                pdf_patchs = pd.DataFrame({
-                    "row": [0],
-                    "col": [0],
-                })
-                pdf_patchs["height"] = height
-                pdf_patchs["width"] = width
-                pdf_patchs["nchannels"] = nchannels
-                pdf_patchs["path"] = os.path.join(
-                    self.root_folder,
-                    img_info["path"]
-                )
+                pdf_patchs = {
+                    "resize": False,
+                    "height": height,
+                    "width" : width,
+                    "nchannels": nchannels,
+                    "path"  : os.path.join(
+                        self.root_folder,
+                        img_info["path"]
+                    )
+                }
                 list_pdf_per_img.append(pdf_patchs)
 
-        self.images_data_all = pd.concat(list_pdf_per_img).reset_index(drop=True)
+        self.images_data_all = pd.DataFrame(list_pdf_per_img).reset_index(drop=True)
         self.logger.info(f"Dataset - Create total {self.images_data_all.shape[0]} cropped images")
 
     def create_patchs(self, max_num_patchs):
@@ -158,31 +157,23 @@ class ImageSuperResolution(Dataset):
         for loop in range(N_loops):
             for i in range(self.images_data_all.shape[0]):
                 img_info = self.images_data_all.iloc[i]
-                # print(img_info)
                 height = img_info["height"]
                 width  = img_info["width"]
-                row = img_info["row"]
-                col  = img_info["col"]
                 nchannels  = img_info["nchannels"]
                 if nchannels > 3:
                     continue
 
+                patchs = dict(img_info)
                 if (self.patch_size[0] < height) and (self.patch_size[1] < width):
-                    patchs = {
-                        "row": row + self.random_state.randint(0, height - self.patch_size[0]),
-                        "col": col + self.random_state.randint(0, width - self.patch_size[1]),
-                        "padding": False, 
-                        "path": img_info["path"]
-                    }
-                    list_pdf_per_img.append(patchs)
+                    patchs["row"] = self.random_state.randint(0, height - self.patch_size[0])
+                    patchs["col"] = self.random_state.randint(0, width - self.patch_size[1])
+                    patchs["padding"] = False
                 else:
-                    patchs = {
-                        "row": row,
-                        "col": col,
-                        "padding": True, 
-                        "path": img_info["path"]
-                    }
-                    list_pdf_per_img.append(patchs)
+                    patchs["row"] = 0
+                    patchs["col"] = 0
+                    patchs["padding"] = True
+
+                list_pdf_per_img.append(patchs)
 
         self.patchs_data_all = pd.DataFrame(list_pdf_per_img)
         self.logger.info(f"Dataset - Create total {self.patchs_data_all.shape[0]} patchs")
@@ -193,8 +184,15 @@ class ImageSuperResolution(Dataset):
         self.patchs_data = self.patchs_data_all.iloc[ind].copy()
 
     def __getitem__(self, idx):
-        row, col, need_padding, path = tuple(self.patchs_data.iloc[idx])
+        patch_info = self.patchs_data.iloc[idx]
+        (
+            resize, height, width, nchannels,
+            path, row, col, need_padding,
+        ) = tuple(self.patchs_data.iloc[idx])
         img = Image.open(path)
+        if resize:
+            img = img.resize((width, height))
+        
         img = np.array(img)
         if need_padding:
             patch = img[row:row + self.patch_size[0], col: col + self.patch_size[1], :]
@@ -204,6 +202,7 @@ class ImageSuperResolution(Dataset):
             patch = cv2.copyMakeBorder(patch, 0, h_pad, 0, w_pad, cv2.BORDER_REFLECT)
         else:
             patch = img[row:row + self.patch_size[0], col: col + self.patch_size[1], :]
+
 
         h = patch.shape[0]
         w = patch.shape[1]
@@ -233,7 +232,7 @@ class ImageSuperResolution(Dataset):
             noise = noise * (self.lambda_noise / 255.0)
             patch_dist = patch + noise.astype(np.float32)
 
-
+        patch_dist = np.clip(patch_dist, a_min=0.0, a_max=1.0)
         sample = (
             torch.from_numpy(patch_dist).to(self.device),
             torch.from_numpy(patch).to(self.device)

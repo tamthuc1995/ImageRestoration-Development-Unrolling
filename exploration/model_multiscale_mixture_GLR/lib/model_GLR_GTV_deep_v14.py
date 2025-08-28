@@ -810,103 +810,6 @@ class MixtureGTVGLR(nn.Module):
 
         return output_final
 
-
-# class MixtureGLR(nn.Module):
-#     def __init__(self, 
-#             n_graphs, n_node_fts,
-#             alpha_init, beta_init,
-#             muy_init
-#         ):
-#         super(MixtureGLR, self).__init__()
-#         # MixtureGLR( 
-#         #     n_graphs, n_node_fts,
-#         #     connection_window,
-#         #     n_cgd_iters, alpha_init, beta_init,
-#         #     muy_init
-#         # )
-
-#         self.n_graphs     = n_graphs
-#         self.n_node_fts   = n_node_fts
-#         self.n_channels   = n_graphs * n_node_fts
-#         self.n_cgd_iters  = 3
-
-#         self.alphaCGD =  Parameter(
-#             torch.ones((self.n_cgd_iters, n_graphs), dtype=torch.float32) * alpha_init,
-#             requires_grad=True
-#         )
-
-#         self.betaCGD =  Parameter(
-#             torch.ones((self.n_cgd_iters, n_graphs), dtype=torch.float32) * beta_init,
-#             requires_grad=True
-#         )
-
-#         self.patchs_features_extraction = nn.Sequential(
-#             nn.Conv2d(
-#                 in_channels=self.n_channels, 
-#                 out_channels=self.n_channels, 
-#                 kernel_size=1,
-#                 stride=1,
-#                 padding=0, # padding_mode="replicate",
-#                 groups=1,
-#                 bias=False
-#             )
-#         )
-
-#         self.muys00 = Parameter(
-#             torch.ones((n_graphs), dtype=torch.float32) * muy_init[0],
-#             requires_grad=True,
-#         )
-#         self.GLRmodule00 = GLRFast(
-#             n_node_fts=self.n_node_fts,
-#             n_graphs=self.n_graphs,
-#             M_diag_init=1.0
-#         )
-
-#     def apply_lightweight_transformer(self, patchs, graph_weightGLR):
-
-#         batch_size, n_graphs, c_size, h_size, w_size = patchs.shape 
-#         patchs = patchs.contiguous()
-#         graph_weights, graph_degree = graph_weightGLR
-
-#         Lpatchs = self.GLRmodule00(patchs, graph_weights, graph_degree)
-#         Lpatchs = torch.einsum(
-#             "bHchw, H -> bHchw", Lpatchs, self.muys00
-#         )
-
-#         output = patchs + Lpatchs
-
-#         return output
-    
-#     def forward(self, patchs):
-#         batch_size, c_size, h_size, w_size = patchs.shape
-
-#         #####
-#         ## Graph low pass filter
-#         features_patchs = self.patchs_features_extraction(patchs)
-#         bz, nfts, h, w = features_patchs.shape
-
-#         graph_weightGLR = self.GLRmodule00.extract_edge_weights(
-#             features_patchs.view((bz, self.GLRmodule00.n_graphs, self.GLRmodule00.n_node_fts, h, w))
-#         )
-
-#         left_hand_sizeA = patchs.view((bz, self.n_graphs, self.n_node_fts, h, w))
-#         ############################################################
-#         output00          = left_hand_sizeA
-#         system_residual00 = left_hand_sizeA -  self.apply_lightweight_transformer(output00, graph_weightGLR)
-#         output01          = output00 + self.alphaCGD[0, None, :, None, None, None] * system_residual00
-
-#         system_residual02 = left_hand_sizeA -  self.apply_lightweight_transformer(output01, graph_weightGLR)
-#         update01 = system_residual02 + self.betaCGD[1, None, :, None, None, None] * system_residual00
-#         output02 = output01 + self.alphaCGD[1, None, :, None, None, None] * update01
-
-#         system_residual03 = left_hand_sizeA -  self.apply_lightweight_transformer(output02, graph_weightGLR)
-#         update03 = system_residual03 + self.betaCGD[2, None, :, None, None, None] * update01
-#         output03 = output02 + self.alphaCGD[2, None, :, None, None, None] * update03
-
-#         output_final = output03.view((batch_size, c_size, h_size, w_size))
-
-#         return output_final
-
 ##########################################################################
 class CustomLayerNorm(nn.Module):
     def __init__(self, nchannels, nsubnets):
@@ -1029,23 +932,15 @@ class AbtractMultiScaleGraphFilter(nn.Module):
     def __init__(self, 
         n_channels_in=3, 
         n_channels_out=3, 
-        dims=[48, 64, 96, 128],
-        hidden_dims=[128, 192, 256, 384],
+        dims=[48, 64],
+        hidden_dims=[128, 192],
         nsubnets=[1, 1, 1, 1],
-        ngraphs=[4, 4, 8, 8],
-        num_blocks=[4, 6, 6, 8], 
+        ngraphs=[4, 4],
+        num_blocks=[4, 6], 
         num_blocks_out=4
     ):
 
         super(AbtractMultiScaleGraphFilter, self).__init__()
-
-        # MixtureGTVGLR( 
-        #     n_graphs, n_node_fts,
-        #     connection_window,
-        #     n_cgd_iters, alpha_init, beta_init,
-        #     muy_init, ro_init, gamma_init,
-        #     device
-        # )
 
         # ENCODING
         self.patch_3x3_embeding = ReginalPixelEmbeding(n_channels_in, dims[0])
@@ -1058,34 +953,9 @@ class AbtractMultiScaleGraphFilter(nn.Module):
             LocalNonLinearBlock(dim=dims[1], hidden_dim=hidden_dims[1], nsubnets=nsubnets[1]) for i in range(num_blocks[1])
         ])
 
-        self.down_sample_01_02 = Downsampling(dim_in=dims[1], dim_out=dims[2], nsubnets=nsubnets[1]) 
-        self.encoder_scale_02 = nn.Sequential(*[
-            LocalNonLinearBlock(dim=dims[2], hidden_dim=hidden_dims[2], nsubnets=nsubnets[2]) for i in range(num_blocks[2])
-        ])
-
-        self.down_sample_02_03 = Downsampling(dim_in=dims[2], dim_out=dims[3], nsubnets=nsubnets[2]) 
-        self.encoder_scale_03 = nn.Sequential(*[
-            LocalNonLinearBlock(dim=dims[3], hidden_dim=hidden_dims[3], nsubnets=nsubnets[3]) for i in range(num_blocks[3])
-        ])
-
         ## FILTER
         self.localfilter_scale_00 = LocalLowpassFilteringBlock(dim=dims[0], nsubnets=nsubnets[0], ngraphs=ngraphs[0])
         self.localfilter_scale_01 = LocalLowpassFilteringBlock(dim=dims[1], nsubnets=nsubnets[1], ngraphs=ngraphs[1])
-        self.localfilter_scale_02 = LocalLowpassFilteringBlock(dim=dims[2], nsubnets=nsubnets[2], ngraphs=ngraphs[2])
-        self.localfilter_scale_03 = LocalLowpassFilteringBlock(dim=dims[3], nsubnets=nsubnets[3], ngraphs=ngraphs[3])
-
-        # DECODING
-        self.up_sample_03_02 = Upsampling(dim_in=dims[3], dim_out=dims[2], nsubnets=nsubnets[3])
-        self.combine_channels_02 = nn.Conv2d(dims[2]*2, dims[2], kernel_size=1, bias=False, groups=nsubnets[2])
-        self.decoder_scale_02 = nn.Sequential(*[
-            LocalNonLinearBlock(dim=dims[2], hidden_dim=hidden_dims[2], nsubnets=nsubnets[2]) for i in range(num_blocks[2])
-        ])
-
-        self.up_sample_02_01 = Upsampling(dim_in=dims[2], dim_out=dims[1], nsubnets=nsubnets[2])
-        self.combine_channels_01 = nn.Conv2d(dims[1]*2, dims[1], kernel_size=1, bias=False, groups=nsubnets[1])
-        self.decoder_scale_01 = nn.Sequential(*[
-            LocalNonLinearBlock(dim=dims[1], hidden_dim=hidden_dims[1], nsubnets=nsubnets[1]) for i in range(num_blocks[1])
-        ])
 
         self.up_sample_01_00 = Upsampling(dim_in=dims[1], dim_out=dims[0], nsubnets=nsubnets[1])
         self.combine_channels_00 = nn.Conv2d(dims[0]*2, dims[0], kernel_size=1, bias=False, groups=nsubnets[0])
@@ -1106,51 +976,30 @@ class AbtractMultiScaleGraphFilter(nn.Module):
         inp_enc_scale_01 = self.down_sample_00_01(out_enc_scale_00)
         out_enc_scale_01 = self.encoder_scale_01(inp_enc_scale_01)
 
-        inp_enc_scale_02 = self.down_sample_01_02(out_enc_scale_01)
-        out_enc_scale_02 = self.encoder_scale_02(inp_enc_scale_02)
-
-        inp_enc_scale_03 = self.down_sample_02_03(out_enc_scale_02)
-        out_enc_scale_03 = self.encoder_scale_03(inp_enc_scale_03)
-
-        return (out_enc_scale_00, out_enc_scale_01, out_enc_scale_02, out_enc_scale_03)
+        return (out_enc_scale_00, out_enc_scale_01)
     
     def filtering(self, coefs):
         (
             out_enc_scale_00,
             out_enc_scale_01,
-            out_enc_scale_02,
-            out_enc_scale_03
         ) = coefs
 
         # FILTERING
         out_filtered_enc_scale_00 = self.localfilter_scale_00(out_enc_scale_00)
         out_filtered_enc_scale_01 = self.localfilter_scale_01(out_enc_scale_01)
-        out_filtered_enc_scale_02 = self.localfilter_scale_02(out_enc_scale_02)
-        out_filtered_enc_scale_03 = self.localfilter_scale_03(out_enc_scale_03)
 
-        return (out_filtered_enc_scale_00, out_filtered_enc_scale_01, out_filtered_enc_scale_02, out_filtered_enc_scale_03)
+        return (out_filtered_enc_scale_00, out_filtered_enc_scale_01)
     
     def decode(self, coefs):
 
         (
             out_enc_scale_00,
             out_enc_scale_01,
-            out_enc_scale_02,
-            out_enc_scale_03
         ) = coefs
 
         # Upward DECODING
-        inp_dec_scale_02 = self.up_sample_03_02(out_enc_scale_03)
-        out_dec_scale_02 = torch.cat([inp_dec_scale_02, out_enc_scale_02], 1)
-        out_dec_scale_02 = self.combine_channels_02(out_dec_scale_02)
-        out_dec_scale_02 = self.decoder_scale_02(out_dec_scale_02)
 
-        inp_dec_scale_01 = self.up_sample_02_01(out_dec_scale_02)
-        out_dec_scale_01 = torch.cat([inp_dec_scale_01, out_enc_scale_01], 1)
-        out_dec_scale_01 = self.combine_channels_01(out_dec_scale_01)
-        out_dec_scale_01 = self.decoder_scale_01(out_dec_scale_01)
-
-        inp_dec_scale_00 = self.up_sample_01_00(out_dec_scale_01)
+        inp_dec_scale_00 = self.up_sample_01_00(out_enc_scale_01)
         out_dec_scale_00 = torch.cat([inp_dec_scale_00, out_enc_scale_00], 1)
         out_dec_scale_00 = self.combine_channels_00(out_dec_scale_00)
         out_dec_scale_00 = self.decoder_scale_00(out_dec_scale_00)
@@ -1172,3 +1021,64 @@ class AbtractMultiScaleGraphFilter(nn.Module):
         output = self.decode(coefs_filtered)
 
         return output
+
+# class AbtractMultiScaleGraphFilter(nn.Module):
+#     def __init__(self, 
+#         n_channels_in=3, 
+#         n_channels_abtract=48, 
+#         n_channels_out=3, 
+#         nsubnets=[1],
+#         ngraphs=[8],
+#         num_blocks=[4], 
+#     ):
+
+
+#         super(AbtractMultiScaleGraphFilter, self).__init__()
+
+#         self.patch_3x3_embeding = nn.Conv2d(
+#             n_channels_in, n_channels_abtract, 
+#             kernel_size=2, stride=2, 
+#             padding=0,
+#             bias=False
+#         )
+
+#         self.encoder = nn.Sequential(*[
+#             LocalNonLinearBlock(dim=n_channels_abtract, hidden_dim=n_channels_abtract*8//3, nsubnets=nsubnets[0]) for i in range(num_blocks[0])
+#         ])
+#         self.filter = LocalLowpassFilteringBlock(
+#             dim=n_channels_abtract,
+#             ngraphs=ngraphs[0]
+#         )
+#         self.decoder = nn.Sequential(*[
+#             LocalNonLinearBlock(dim=n_channels_abtract, hidden_dim=n_channels_abtract*8//3, nsubnets=nsubnets[0]) for i in range(num_blocks[0])
+#         ])
+        
+#         self.linear_output = nn.ConvTranspose2d(
+#             n_channels_abtract, n_channels_out,
+#             kernel_size=2, stride=2, 
+#             padding=0,
+#             bias=False
+#         )
+
+#     def enc_dec(self, img):
+#         #enc
+#         coefs = self.patch_3x3_embeding(img)
+#         coefs = self.encoder(coefs)
+
+#         #dec
+#         output = self.decoder(coefs)
+#         output = self.linear_output(output)
+#         return output
+
+#     def forward(self, img):
+#         #enc
+#         coefs = self.patch_3x3_embeding(img)
+#         coefs = self.encoder(coefs)
+
+#         #filter
+#         coefs_filtered = self.filter(coefs)
+
+#         #dec
+#         output = self.decoder(coefs_filtered)
+#         output = self.linear_output(output)
+#         return output

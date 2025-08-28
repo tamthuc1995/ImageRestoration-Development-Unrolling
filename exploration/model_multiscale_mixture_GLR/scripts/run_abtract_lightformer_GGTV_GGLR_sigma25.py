@@ -73,10 +73,11 @@ train_dataset02 = ImageSuperResolution(
     lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train02,H_train02),
-    max_num_patchs=600000,
+    max_num_patchs=210000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
+    seed=2224
 )
 data_train_batched02 = torch.utils.data.DataLoader(
     train_dataset02, batch_size=3, num_workers=4
@@ -121,11 +122,21 @@ model = model_structure.AbtractMultiScaleGraphFilter(
     n_channels_in=3, 
     n_channels_out=3, 
     dims=[48, 96, 192, 384],
+    hidden_dims=[96, 192, 384, 768],
     nsubnets=[1, 1, 1, 1],
     ngraphs=[8, 16, 16, 32], #[1, 2, 4, 8], 
     num_blocks=[4, 6, 6, 8], 
     num_blocks_out=4
 ).to(DEVICE)
+
+# model = model_structure.AbtractMultiScaleGraphFilter(
+#     n_channels_in=3, 
+#     n_channels_abtract=192, 
+#     n_channels_out=3, 
+#     nsubnets=[1],
+#     ngraphs=[16],
+#     num_blocks=[5], 
+# )
 model.compile()
 
 s = 0
@@ -162,13 +173,13 @@ lr_scheduler = SequentialLR(
 ### TRAINING
 LOGGER.info("######################################################################################")
 LOGGER.info("BEGIN TRAINING PROCESS")
-# training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0400k.pt')
-# training_state = torch.load(training_state_path, weights_only=False)
-# model.load_state_dict(training_state["model"])
-# optimizer.load_state_dict(training_state["optimizer"])
-# lr_scheduler.load_state_dict(training_state["lr_scheduler"])
-# i=training_state["i"]
-i = 0
+training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0330k.pt')
+training_state = torch.load(training_state_path, weights_only=False)
+model.load_state_dict(training_state["model"])
+optimizer.load_state_dict(training_state["optimizer"])
+lr_scheduler.load_state_dict(training_state["lr_scheduler"])
+i=training_state["i"]
+# i = 0
 
 
 for epoch in range(NUM_EPOCHS):
@@ -178,7 +189,7 @@ for epoch in range(NUM_EPOCHS):
     ### TRAINING
     list_train_mse = []
     list_train_psnr = []
-    combined_dataloader = itertools.chain(data_train_batched01, data_train_batched02, data_train_batched03, data_train_batched04)
+    combined_dataloader = itertools.chain(data_train_batched02, data_train_batched03, data_train_batched04)
     for patchs_noisy, patchs_true in combined_dataloader:
         s = time.time()
         optimizer.zero_grad()
@@ -188,6 +199,7 @@ for epoch in range(NUM_EPOCHS):
         reconstruct_patchs_true = model.enc_dec(patchs_true.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
         loss_value = criterian01(reconstruct_patchs, patchs_true) + loss02_weight * criterian02(reconstruct_patchs_true, patchs_true)
         loss_value.backward()
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
         optimizer.step()
         lr_scheduler.step()
 
