@@ -21,7 +21,7 @@ from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR, SequentialL
 
 #########################################################################################################
 torch.set_float32_matmul_precision('high')
-DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.set_default_device(DEVICE)
 # torch.autograd.set_detect_anomaly(True)
 
@@ -35,7 +35,7 @@ from dataloader_v2 import ImageSuperResolution
 import model_GLR_GTV_deep_v13 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_sigma50/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_big_sigma50/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -44,7 +44,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_sigma50/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_big_sigma50/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (128, 128)
@@ -121,9 +121,9 @@ model = model_structure.AbtractMultiScaleGraphFilter(
     n_channels_in=3, 
     n_channels_out=3, 
     dims=[48, 96, 192, 384],
-    hidden_dims=[96, 192, 384, 768],
+    hidden_dims=[128, 256, 512, 1024],
     nsubnets=[1, 1, 1, 1],
-    ngraphs=[8, 16, 16, 32], #[1, 2, 4, 8], 
+    ngraphs=[8, 16, 16, 32], 
     num_blocks=[4, 6, 6, 8], 
     num_blocks_out=4
 ).to(DEVICE)

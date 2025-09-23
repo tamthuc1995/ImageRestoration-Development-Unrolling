@@ -1,7 +1,10 @@
 *.pyc
 *.txt
+*.png
+*.zip
 
 dataset/
 experiments/*
 exploration/*/result
+exploration/*/result_images
 exploration/DELETED

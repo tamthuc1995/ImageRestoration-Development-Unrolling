@@ -35,7 +35,7 @@ from dataloader_v2 import ImageSuperResolution
 import model_GLR_GTV_deep_v13 as model_structure
 
 
-LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13/logs/")
+LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_big_sigma25/logs/")
 LOGGER = logging.getLogger("main")
 logging.basicConfig(
     format='%(asctime)s: %(message)s', 
@@ -44,7 +44,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13/checkpoints/")
+CHECKPOINT_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result/model_test31_v13_big_sigma25/checkpoints/")
 VERBOSE_RATE = 1000
 
 (H_train01, W_train01) = (128, 128)
@@ -73,7 +73,7 @@ train_dataset02 = ImageSuperResolution(
     lambda_noise=25.0,
     use_data_aug=True,
     patch_size=(H_train02,H_train02),
-    max_num_patchs=210000,
+    max_num_patchs=600000,
     root_folder=ROOT_DATASET,
     logger=LOGGER,
     device=torch.device("cpu"),
@@ -122,21 +122,12 @@ model = model_structure.AbtractMultiScaleGraphFilter(
     n_channels_in=3, 
     n_channels_out=3, 
     dims=[48, 96, 192, 384],
-    hidden_dims=[96, 192, 384, 768],
+    hidden_dims=[128, 256, 512, 1024],
     nsubnets=[1, 1, 1, 1],
-    ngraphs=[8, 16, 16, 32], #[1, 2, 4, 8], 
+    ngraphs=[8, 16, 16, 32], 
     num_blocks=[4, 6, 6, 8], 
     num_blocks_out=4
 ).to(DEVICE)
-
-# model = model_structure.AbtractMultiScaleGraphFilter(
-#     n_channels_in=3, 
-#     n_channels_abtract=192, 
-#     n_channels_out=3, 
-#     nsubnets=[1],
-#     ngraphs=[16],
-#     num_blocks=[5], 
-# )
 model.compile()
 
 s = 0
@@ -173,13 +164,13 @@ lr_scheduler = SequentialLR(
 ### TRAINING
 LOGGER.info("######################################################################################")
 LOGGER.info("BEGIN TRAINING PROCESS")
-training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0330k.pt')
-training_state = torch.load(training_state_path, weights_only=False)
-model.load_state_dict(training_state["model"])
-optimizer.load_state_dict(training_state["optimizer"])
-lr_scheduler.load_state_dict(training_state["lr_scheduler"])
-i=training_state["i"]
-# i = 0
+# training_state_path = os.path.join(CHECKPOINT_DIR, 'checkpoints_epoch00_iter0330k.pt')
+# training_state = torch.load(training_state_path, weights_only=False)
+# model.load_state_dict(training_state["model"])
+# optimizer.load_state_dict(training_state["optimizer"])
+# lr_scheduler.load_state_dict(training_state["lr_scheduler"])
+# i=training_state["i"]
+i = 0
 
 
 for epoch in range(NUM_EPOCHS):
@@ -189,7 +180,7 @@ for epoch in range(NUM_EPOCHS):
     ### TRAINING
     list_train_mse = []
     list_train_psnr = []
-    combined_dataloader = itertools.chain(data_train_batched02, data_train_batched03, data_train_batched04)
+    combined_dataloader = itertools.chain(data_train_batched01, data_train_batched02, data_train_batched03, data_train_batched04)
     for patchs_noisy, patchs_true in combined_dataloader:
         s = time.time()
         optimizer.zero_grad()
