@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
 from torch.profiler import profile, record_function, ProfilerActivity
+from torch.nn.utils.parametrizations import spectral_norm
 # torch.set_default_dtype(torch.float64)
 
 from einops import rearrange
@@ -937,7 +938,7 @@ class CustomLayerNorm(nn.Module):
         super(CustomLayerNorm, self).__init__()
         self.nsubnets = nsubnets
         self.nchannels = nchannels
-        self.weighted_transform = nn.utils.spectral_norm(nn.Conv2d(nchannels, nchannels, kernel_size=1, stride=1, groups=nchannels, bias=False))
+        self.weighted_transform = spectral_norm(nn.Conv2d(nchannels, nchannels, kernel_size=1, stride=1, groups=nchannels, bias=False))
 
     def forward(self, x):
         bz, nchannels, h, w = x.shape
@@ -954,15 +955,15 @@ class LocalGatedLinearBlock(nn.Module):
     def __init__(self, dim, hidden_dim, nsubnets):
         super(LocalGatedLinearBlock, self).__init__()
 
-        self.channels_linear_op       = nn.utils.spectral_norm(nn.Conv2d(dim, hidden_dim*2, kernel_size=1, bias=False, groups=nsubnets))
-        self.channels_local_linear_op = nn.utils.spectral_norm(nn.Conv2d(
+        self.channels_linear_op       = spectral_norm(nn.Conv2d(dim, hidden_dim*2, kernel_size=1, bias=False, groups=nsubnets))
+        self.channels_local_linear_op = spectral_norm(nn.Conv2d(
             hidden_dim*2, hidden_dim*2, 
             kernel_size=3, stride=1, 
             padding=1, padding_mode="replicate",
             groups=hidden_dim*2, 
             bias=False
         ))
-        self.project_out = nn.utils.spectral_norm(nn.Conv2d(hidden_dim, dim, kernel_size=1, bias=False, groups=nsubnets))
+        self.project_out = spectral_norm(nn.Conv2d(hidden_dim, dim, kernel_size=1, bias=False, groups=nsubnets))
 
     def forward(self, x):
         x = self.channels_linear_op(x)
@@ -1017,7 +1018,7 @@ class ReginalPixelEmbeding(nn.Module):
     def __init__(self, n_channels_in=3, dim=48, bias=False):
         super(ReginalPixelEmbeding, self).__init__()
 
-        self.channels_local_linear_op01 = nn.utils.spectral_norm(nn.Conv2d(
+        self.channels_local_linear_op01 = spectral_norm(nn.Conv2d(
             n_channels_in, dim, 
             kernel_size=3, stride=1, 
             padding=1, padding_mode="replicate",
@@ -1034,7 +1035,7 @@ class ReginalPixelEmbeding(nn.Module):
 class Downsampling(nn.Module):
     def __init__(self, dim_in, dim_out, nsubnets):
         super(Downsampling, self).__init__()
-        self.local_linear = nn.utils.spectral_norm(nn.Conv2d(dim_in, dim_out, kernel_size=2, stride=2, padding=0, groups=nsubnets, bias=False))
+        self.local_linear = spectral_norm(nn.Conv2d(dim_in, dim_out, kernel_size=2, stride=2, padding=0, groups=nsubnets, bias=False))
     def forward(self, x):
         x = self.local_linear(x)
         return x
@@ -1042,7 +1043,7 @@ class Downsampling(nn.Module):
 class Upsampling(nn.Module):
     def __init__(self, dim_in, dim_out, nsubnets):
         super(Upsampling, self).__init__()
-        self.local_linear = nn.utils.spectral_norm(nn.ConvTranspose2d(dim_in, dim_out, kernel_size=2, stride=2, padding=0, groups=nsubnets, bias=False))
+        self.local_linear = spectral_norm(nn.ConvTranspose2d(dim_in, dim_out, kernel_size=2, stride=2, padding=0, groups=nsubnets, bias=False))
     def forward(self, x):
         x = self.local_linear(x)
         return x
@@ -1100,19 +1101,19 @@ class AbtractMultiScaleGraphFilter(nn.Module):
 
         # DECODING
         self.up_sample_03_02 = Upsampling(dim_in=dims[3], dim_out=dims[2], nsubnets=nsubnets[3])
-        self.combine_channels_02 = nn.utils.spectral_norm(nn.Conv2d(dims[2]*2, dims[2], kernel_size=1, bias=False, groups=nsubnets[2]))
+        self.combine_channels_02 = spectral_norm(nn.Conv2d(dims[2]*2, dims[2], kernel_size=1, bias=False, groups=nsubnets[2]))
         self.decoder_scale_02 = nn.Sequential(*[
             LocalNonLinearBlock(dim=dims[2], hidden_dim=hidden_dims[2], nsubnets=nsubnets[2]) for i in range(num_blocks[2])
         ])
 
         self.up_sample_02_01 = Upsampling(dim_in=dims[2], dim_out=dims[1], nsubnets=nsubnets[2])
-        self.combine_channels_01 = nn.utils.spectral_norm(nn.Conv2d(dims[1]*2, dims[1], kernel_size=1, bias=False, groups=nsubnets[1]))
+        self.combine_channels_01 = spectral_norm(nn.Conv2d(dims[1]*2, dims[1], kernel_size=1, bias=False, groups=nsubnets[1]))
         self.decoder_scale_01 = nn.Sequential(*[
             LocalNonLinearBlock(dim=dims[1], hidden_dim=hidden_dims[1], nsubnets=nsubnets[1]) for i in range(num_blocks[1])
         ])
 
         self.up_sample_01_00 = Upsampling(dim_in=dims[1], dim_out=dims[0], nsubnets=nsubnets[1])
-        self.combine_channels_00 = nn.utils.spectral_norm(nn.Conv2d(dims[0]*2, dims[0], kernel_size=1, bias=False, groups=nsubnets[0]))
+        self.combine_channels_00 = spectral_norm(nn.Conv2d(dims[0]*2, dims[0], kernel_size=1, bias=False, groups=nsubnets[0]))
         self.decoder_scale_00 = nn.Sequential(*[
             LocalNonLinearBlock(dim=dims[0], hidden_dim=hidden_dims[0], nsubnets=nsubnets[0]) for i in range(num_blocks[0])
         ])
@@ -1120,7 +1121,7 @@ class AbtractMultiScaleGraphFilter(nn.Module):
         self.refining_block = nn.Sequential(*[
             LocalNonLinearBlock(dim=dims[0], hidden_dim=hidden_dims[0], nsubnets=nsubnets[0]) for i in range(num_blocks_out)
         ])
-        self.linear_output = nn.utils.spectral_norm(nn.Conv2d(dims[0], n_channels_out, kernel_size=1, bias=False))
+        self.linear_output = spectral_norm(nn.Conv2d(dims[0], n_channels_out, kernel_size=1, bias=False))
     
     def encode(self, img):
         # Downward ENCODING
