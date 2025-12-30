@@ -32,7 +32,7 @@ ROOT_DATASET = "/home/jovyan/shared/Thuc/hoodsgatedrive/projects/"
 
 sys.path.append(os.path.join(ROOT_PROJECT, 'exploration/model_multiscale_mixture_GLR/lib'))
 from dataloader_v2 import ImageSuperResolution
-import model_GLR_GTV_deep_v21 as model_structure
+import model_GLR_GTV_deep_v13 as model_structure
 
 
 LOG_DIR = os.path.join(ROOT_PROJECT, "exploration/model_multiscale_mixture_GLR/result_v2/model_v20_sigma_15/logs/")
@@ -140,6 +140,9 @@ criterian01 = nn.L1Loss()
 criterian02 = nn.MSELoss()
 loss02_weight = 0.1
 
+criterian03 = nn.MSELoss()
+loss03_weight = 0.5
+
 optimizer = Adam(
     model.parameters(),
     lr=0.0004,
@@ -186,8 +189,20 @@ for epoch in range(NUM_EPOCHS):
         patchs_noisy = patchs_noisy.to(DEVICE)
         patchs_true = patchs_true.to(DEVICE) 
         reconstruct_patchs = model(patchs_noisy.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
-        reconstruct_patchs_true = model.enc_dec(patchs_true.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
-        loss_value = criterian01(reconstruct_patchs, patchs_true) + loss02_weight * criterian02(reconstruct_patchs_true, patchs_true)
+        loss_value = criterian01(reconstruct_patchs, patchs_true) 
+        
+        # REGULATION 
+        latent = model.encode(patchs_true.permute(0, 3, 1, 2))
+        reconstruct_patchs_true = model.decode(latent).permute(0, 2, 3, 1)
+        reconstruct_patchs_true_disturb = model.decode((
+            latent[0] + torch.normal(0.0, 0.05, size=latent[0].size(), device=latent[0].device, dtype=latent[0].dtype),
+            latent[1] + torch.normal(0.0, 0.05, size=latent[1].size(), device=latent[1].device, dtype=latent[1].dtype),
+            latent[2] + torch.normal(0.0, 0.05, size=latent[2].size(), device=latent[2].device, dtype=latent[2].dtype),
+            latent[3] + torch.normal(0.0, 0.05, size=latent[3].size(), device=latent[3].device, dtype=latent[3].dtype),
+        )).permute(0, 2, 3, 1)
+        loss_value = loss_value + loss02_weight * criterian02(reconstruct_patchs_true, patchs_true)
+        loss_value = loss_value + loss03_weight * criterian03(reconstruct_patchs_true, reconstruct_patchs_true_disturb)
+
         loss_value.backward()
         # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
         optimizer.step()
