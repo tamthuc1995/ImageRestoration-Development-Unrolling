@@ -2,7 +2,7 @@
 *.txt
 *.zip
 
-dataset/
+dataset_and_models/
 experiments/*
 exploration/*/result
 exploration/*/result_v2
